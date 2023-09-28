@@ -137,6 +137,10 @@ class ScannetppScene_Release:
         return self.iphone_data_dir / 'rgb_mask.mkv'
     
     @property
+    def iphone_video_mask_dir(self):
+        return self.iphone_data_dir / 'rgb_masks'
+    
+    @property
     def iphone_depth_path(self):
         return self.iphone_data_dir / 'depth.bin'
     

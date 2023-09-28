@@ -64,7 +64,9 @@ def extract_rgb(scene):
     run_command(cmd, verbose=True)
 
 def extract_masks(scene):
-    pass
+    scene.iphone_video_mask_dir.mkdir(parents=True, exist_ok=True)
+    cmd = f"ffmpeg -i {str(scene.iphone_video_mask_path)} -pix_fmt gray -start_number 0 {scene.iphone_video_mask_dir}/frame_%06d.png"
+    run_command(cmd, verbose=True)
 
 def extract_depth(scene):
     # global compression with zlib
@@ -113,21 +115,19 @@ def extract_depth(scene):
 def main(args):
     cfg = load_yaml_munch(args.config_file)
 
-
-    # get the list of scenes to be downloaded
+    # get the scenes to process
     if cfg.get('scene_ids'):
         scene_ids = cfg.scene_ids
-    elif cfg.get('download_splits'):
+    elif cfg.get('splits'):
         scene_ids = []
-        for split in cfg.download_splits:
+        for split in cfg.splits:
             split_path = Path(cfg.data_root) / 'splits' / f'{split}.txt'
             scene_ids += read_txt_list(split_path)
 
-    # get the scenes to process
     # get the options to process
     # go through each scene
     for scene_id in tqdm(scene_ids, desc='scene'):
-        scene = ScannetppScene_Release(scene_id, data_root=cfg.data_root)
+        scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / 'data')
 
         if cfg.extract_rgb:
             extract_rgb(scene)
