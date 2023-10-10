@@ -159,3 +159,7 @@ class ScannetppScene_Release:
     @property
     def iphone_nerfstudio_transform_path(self):
         return self.iphone_data_dir / 'nerfstudio' / 'transforms.json'
+    
+    @property
+    def iphone_exif_path(self):
+        return self.iphone_data_dir / 'exif.json'
