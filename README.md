@@ -7,7 +7,13 @@ conda create -n scannetpp python=3.10
 conda activate scannetpp
 pip install -r requirements.txt
 ```
-# DSLR Undistortion
+
+# DSLR
+
+## Undistortion
+Undistort DSLR images (and masks) based on COLMAP so that the output images are pinhole camera models.
+
+You will need [COLMAP](https://colmap.github.io/) installed to run this script.
 
 Insert `data_root` and `output_dir` in `dslr/configs/undistort_dslr.yml` and run:
 ```

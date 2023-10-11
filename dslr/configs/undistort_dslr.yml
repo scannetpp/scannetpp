@@ -1,3 +1,8 @@
+# Specify the path to the colmap executable
+colmap_exec: colmap
+# Crop the image border (x-axis) during undistortion since those regions have more distortion
+crop_border: True
+
 # folder where the data is downloaded
 data_root: DATA_ROOT
 

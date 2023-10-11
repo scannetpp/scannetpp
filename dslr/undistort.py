@@ -166,14 +166,16 @@ def main(args):
             input_model_dir=scene.dslr_colmap_dir,
             output_dir=output_dir,
             max_size=cfg.max_size,
-            crop=True,
+            crop=cfg.crop_border,
+            colmap_exec=cfg.colmap_exec,
         )
         undistort_images(
             image_dir=scene.dslr_resized_dir,
             input_model_dir=scene.dslr_colmap_dir,
             output_dir=output_dir,
             max_size=cfg.max_size,
-            crop=True,
+            crop=cfg.crop_border,
+            colmap_exec=cfg.colmap_exec,
         )
         update_transforms_json(
             output_dir / "colmap",
