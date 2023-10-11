@@ -23,6 +23,15 @@ def undistort_anon_masks(
     max_size: int = 2000,
     crop: bool = False,
 ):
+    """Undistort masks using COLMAP.
+    args:
+        image_dir: Path to the directory containing the masks.
+        input_model_dir: Path to the directory containing the COLMAP model.
+        output_dir: Path to the directory where the undistorted masks will be saved.
+        colmap_exec: Path to the COLMAP executable.
+        max_size: Maximum size of the undistorted images.
+        crop: Whether to crop the image borders (x-axis) during the undistortion.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
 
@@ -89,6 +98,15 @@ def undistort_images(
     max_size: int = 2000,
     crop: bool = False,
 ):
+    """Undistort images using COLMAP.
+    args:
+        image_dir: Path to the directory containing the images.
+        input_model_dir: Path to the directory containing the COLMAP model.
+        output_dir: Path to the directory where the undistorted images will be saved.
+        colmap_exec: Path to the COLMAP executable.
+        max_size: Maximum size of the undistorted images.
+        crop: Whether to crop the image borders (x-axis) during the undistortion.
+    """
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir = Path(tmpdir)
         undistort_dir = tmpdir / "undistort"
