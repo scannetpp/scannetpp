@@ -5,7 +5,7 @@ from pathlib import Path
 import shutil
 import json
 
-from PIL import Image as PILImage
+import imageio
 import numpy as np
 from tqdm import tqdm
 
@@ -75,17 +75,17 @@ def undistort_anon_masks(
         # )
 
         # Go through all the image masks and make sure they are all 0 or 255
-        cameras, images, points3D = read_model(undistort_dir / "sparse", ".txt")
+        cameras, images, points3D = read_model(undistort_dir / "sparse")
         for image_id, image in images.items():
             image_path = undistort_dir / "images" / image.name
-            mask = PILImage.open(image_path)
+            mask = imageio.imread(image_path)
             mask = np.array(mask, dtype=np.uint8)
             if (mask == 255).all():
                 # The mask is all 255
                 continue
             in_between = np.logical_and(mask > 0, mask < 255)
             mask[in_between] = 0
-            PILImage.fromarray(mask).save(image_path, optimize=True)
+            imageio.imwrite(image_path, mask)
 
         shutil.move(undistort_dir / "images", output_dir / "masks")
 
