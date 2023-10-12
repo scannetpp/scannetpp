@@ -31,6 +31,23 @@ output_dir/SCENE_ID
 └── nerfstudio/transforms.json
 ```
 
+# Render Depth for DSLR and iPhone
+
+Install the python package from https://github.com/liu115/renderpy
+
+```
+python -m common.render common/configs/render.yml
+```
+The output will be saved in `output_dir` with the following structure:
+```
+output_dir/SCENE_ID/[dslr, iphone]
+├── render_rgb
+└── render_depth
+```
+The rendered depth maps are single-channel uint16 png, where the unit is mm and 0 means invalid depth.
+
+## Render Semantics (coming soon)
+
 # iPhone
 ## Extract RGB frames, masks and depth frames
 ```
