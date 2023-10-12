@@ -33,7 +33,7 @@ output_dir/SCENE_ID
 
 # Render Depth for DSLR and iPhone
 
-Install the python package from https://github.com/liu115/renderpy
+Install the python package from https://github.com/liu115/renderpy in addtion to the requirements.
 
 ```
 python -m common.render common/configs/render.yml
