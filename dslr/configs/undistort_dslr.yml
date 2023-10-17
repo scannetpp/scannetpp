@@ -1,0 +1,16 @@
+# Specify the path to the colmap executable
+colmap_exec: colmap
+# Crop the image border (x-axis) during undistortion since those regions have more distortion
+crop_border: True
+
+# folder where the data is downloaded
+data_root: DATA_ROOT
+
+splits: [nvs_sem_train, nvs_sem_val]
+
+# scene_ids: [355e5e32db]
+
+# The max size for colmap undistortion, defining the size of the undistorted image (could be height or width)
+max_size: 1440
+
+output_dir: OUTPUT_DIR
