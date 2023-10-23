@@ -152,6 +152,31 @@ def get_test_images(transforms_path: str):
     return image_list
 
 
+def evaluate_all(data_root, pred_dir, scene_list):
+    all_psnr = []
+    all_ssim = []
+    all_lpips = []
+
+    for scene_id in scene_list:
+        scene = ScannetppScene_Release(scene_id, data_root=data_root)
+        image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
+        print(image_list)
+
+        scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
+            Path(pred_dir) / scene_id,
+            scene.dslr_resized_dir,
+            image_list,
+            scene.dslr_resized_mask_dir,
+            auto_resize=True,
+            scene_id=scene_id,
+            verbose=True,
+        )
+        all_psnr += scene_psnr
+        all_ssim += scene_ssim
+        all_lpips += scene_lpips
+    return all_psnr, all_ssim, all_lpips
+
+
 def main(args):
     if args.scene_id is not None:
         val_scenes = [args.scene_id]
@@ -160,30 +185,7 @@ def main(args):
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes]
 
-    all_psnr = []
-    all_ssim = []
-    all_lpips = []
-
-    for scene_id in val_scenes:
-        scene = ScannetppScene_Release(scene_id, data_root=args.data_root)
-        image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
-        print(image_list)
-
-        scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
-            Path(args.pred_dir) / scene_id,
-            scene.dslr_resized_dir,
-            image_list,
-            scene.dslr_resized_mask_dir,
-            # "/mnt/menegroth_bk/scannetpp/data/2022-11-19_11-22/dslr/resized_images_anon",
-            # image_list,
-            # "/mnt/menegroth_bk/scannetpp/data/2022-11-19_11-22/dslr/resized_anon_masks",
-            auto_resize=True,
-            scene_id=scene_id,
-            verbose=True,
-        )
-        all_psnr += scene_psnr
-        all_ssim += scene_ssim
-        all_lpips += scene_lpips
+    all_psnr, all_ssim, all_lpips = evaluate_all(args.data_root, args.pred_dir, val_scenes)
     print(f"Overall PSNR: {np.mean(all_psnr):.4f} +/- {np.std(all_psnr):.4f}")
     print(f"Overall SSIM: {np.mean(all_ssim):.4f} +/- {np.std(all_ssim):.4f}")
     print(f"Overall LPIPS: {np.mean(all_lpips):.4f} +/- {np.std(all_lpips):.4f}")
@@ -209,4 +211,4 @@ if __name__ == "__main__":
     main(args)
 
     # bcd2436daf f3685d06a9 have mask
-    # python -m eval.nvs --data_root /mnt/menegroth_bk/public/release-v1/data --scene_id 3db0a1c8f3 --pred_dir val_pred
+    # python -m eval.nvs --data_root /home/data --scene_id 3db0a1c8f3 --pred_dir val_pred
