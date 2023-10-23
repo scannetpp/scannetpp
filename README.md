@@ -72,3 +72,17 @@ SCENE_ID1/
 ```
 
 ```
+# Semantics
+
+Evaluate 3D Semantic Segmentation. For this you need to prepare the semantic 
+ground truth and predictions in follow format - one file per scene named `<scene_id>.txt`, where each line contains the
+label(s) for the corresponding vertex in the mesh. You can specify either a single label
+or multiple comma-separate labels in each line. Each line should have the same number of labels, i.e
+each file should be an `N x 1` or `N x 3` array for 1 and 3 predictions respectively.
+
+Configure the paths to GT, predictions, label list and downloaded data in `semantic/configs/eval_semantic.yml`
+
+Then run 
+```
+python -m semantic.eval.eval_semantic semantic/configs/eval_semantic.yml
+```
