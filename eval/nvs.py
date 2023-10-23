@@ -13,6 +13,8 @@ from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 from common.scene_release import ScannetppScene_Release
 
+SUPPORT_IMAGE_FORMAT = [".JPG", ".jpg", ".png", ".PNG", ".jpeg"]
+
 
 def evaluate_scene(
     pred_dir: Union[str, Path],
@@ -22,6 +24,7 @@ def evaluate_scene(
     auto_resize: bool = True,
     scene_id: str = "unknown",
     verbose: bool = False,
+    device="cpu",
 ):
     """Evaluate a scene using PSNR, SSIM and LPIPS metrics.
     Args:
@@ -33,13 +36,6 @@ def evaluate_scene(
         scene_id: Scene identifier for verbose print.
         verbose: If True, print the metrics.
     """
-
-    # images = os.listdir(gt_dir)
-    # assert len(images) > 0, f"no images found in GT dir: {gt_dir}"
-    # assert len(images) == len(os.listdir(pred_dir)), f"GT and pred dirs have different number of images"
-
-    # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    device = "cpu"
 
     psnr_metric = PeakSignalNoiseRatio(data_range=1.0)
     # TODO: make sure which one should be used (VGG or Alex)
@@ -56,10 +52,17 @@ def evaluate_scene(
             os.path.join(gt_dir, image_fn)
         ), f"GT image not found: {image_fn}"
         gt_image = Image.open(os.path.join(gt_dir, image_fn))
-        assert os.path.exists(
-            os.path.join(pred_dir, image_fn)
-        ), f"pred image not found: {image_fn}"
-        pred_image = Image.open(os.path.join(pred_dir, image_fn))
+
+        pred_image_path = None
+        for format in SUPPORT_IMAGE_FORMAT:
+            pred_image_path = os.path.join(pred_dir, image_fn.split(".")[0] + format)
+            if os.path.exists(pred_image_path):
+                break
+        if pred_image_path is None:
+            raise ValueError(
+                f"pred image not found: {image_fn} with format {' '.join(SUPPORT_IMAGE_FORMAT)}"
+            )
+        pred_image = Image.open(pred_image_path)
 
         if mask_dir is not None:
             mask_path = os.path.join(mask_dir, image_fn.split(".")[0] + ".png")
@@ -185,7 +188,9 @@ def main(args):
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes]
 
-    all_psnr, all_ssim, all_lpips = evaluate_all(args.data_root, args.pred_dir, val_scenes)
+    all_psnr, all_ssim, all_lpips = evaluate_all(
+        args.data_root, args.pred_dir, val_scenes
+    )
     print(f"Overall PSNR: {np.mean(all_psnr):.4f} +/- {np.std(all_psnr):.4f}")
     print(f"Overall SSIM: {np.mean(all_ssim):.4f} +/- {np.std(all_ssim):.4f}")
     print(f"Overall LPIPS: {np.mean(all_lpips):.4f} +/- {np.std(all_lpips):.4f}")
@@ -210,5 +215,4 @@ if __name__ == "__main__":
     args = p.parse_args()
     main(args)
 
-    # bcd2436daf f3685d06a9 have mask
     # python -m eval.nvs --data_root /home/data --scene_id 3db0a1c8f3 --pred_dir val_pred
