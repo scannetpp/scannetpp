@@ -29,7 +29,6 @@ from copy import deepcopy
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
-from types import SimpleNamespace
 import numpy as np
 
 import semantic.utils.instance_utils as instance_utils
@@ -390,30 +389,10 @@ def main(args):
     scene_ids = read_txt_list(cfg.scene_list_file)
     class_list = read_txt_list(cfg.classes_file)
 
-    # store all label related info in namespace
-    label_info = SimpleNamespace()
-    label_info.all_class_labels = class_list
-    label_info.ignore_classes = [0, 1, 2]
-    label_info.all_class_ids = list(range(len(label_info.all_class_labels)))
-    label_info.class_labels = [label_info.all_class_labels[i] for i in label_info.all_class_ids if i not in label_info.ignore_classes]
-    label_info.valid_class_ids = [i for i in label_info.all_class_ids if i not in label_info.ignore_classes]
-    label_info.id_to_label = {}
-    label_info.label_to_id = {}
-    
-    for i in range(len(label_info.valid_class_ids)):
-        label_info.label_to_id[label_info.class_labels[i]] = label_info.valid_class_ids[i]
-        label_info.id_to_label[label_info.valid_class_ids[i]] = label_info.class_labels[i]
-
-    # ---------- Evaluation params ---------- #
-    # overlaps for evaluation
-    eval_opts = SimpleNamespace()
-    eval_opts.overlaps             = np.append(np.arange(0.5,0.95,0.05), 0.25)
-    # minimum region size for evaluation [verts]
-    eval_opts.min_region_sizes     = np.array( [ 100 ] )
-    # distance thresholds [m]
-    eval_opts.distance_threshes    = np.array( [  float('inf') ] )
-    # distance confidences
-    eval_opts.distance_confs       = np.array( [ -float('inf') ] )
+    # labels to evaluate on, label-id mappings
+    label_info = instance_utils.get_label_info(class_list)
+    # evaluation parameters, can be customized
+    eval_opts = instance_utils.Instance_Eval_Opts()
 
     results = eval_instance(scene_ids, cfg.preds_dir, cfg.gt_dir, cfg.data_root,
                             label_info, eval_opts)

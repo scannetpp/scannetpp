@@ -2,6 +2,7 @@ import os
 import json
 
 import numpy as np
+from types import SimpleNamespace
 
 
 def load_ids(filename):
@@ -9,6 +10,32 @@ def load_ids(filename):
     return ids
 
 # ------------ Instance Utils ------------ #
+
+ # store all label related info in namespace
+def get_label_info(class_list):
+    label_info = SimpleNamespace()
+    label_info.all_class_labels = class_list
+    label_info.ignore_classes = [0, 1, 2]
+    label_info.all_class_ids = list(range(len(label_info.all_class_labels)))
+    label_info.class_labels = [label_info.all_class_labels[i] for i in label_info.all_class_ids if i not in label_info.ignore_classes]
+    label_info.valid_class_ids = [i for i in label_info.all_class_ids if i not in label_info.ignore_classes]
+    label_info.id_to_label = {}
+    label_info.label_to_id = {}
+
+    for i in range(len(label_info.valid_class_ids)):
+        label_info.label_to_id[label_info.class_labels[i]] = label_info.valid_class_ids[i]
+        label_info.id_to_label[label_info.valid_class_ids[i]] = label_info.class_labels[i]
+
+    return label_info
+
+class Instance_Eval_Opts:
+    overlaps             = np.append(np.arange(0.5,0.95,0.05), 0.25)
+    # minimum region size for evaluation [verts]
+    min_region_sizes     = np.array( [ 100 ] )
+    # distance thresholds [m]
+    distance_threshes    = np.array( [  float('inf') ] )
+    # distance confidences
+    distance_confs       = np.array( [ -float('inf') ] )
 
 class Instance(object):
     instance_id = 0
