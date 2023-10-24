@@ -74,6 +74,9 @@ SCENE_ID1/
 ```
 # Semantics
 
+## Prepare 3D Semantics Training Data
+Scripts to sample points on the mesh and map 1.5k+ raw labels to the benchmark classes - coming soon!
+
 ## 3D Semantic Segmentation Evaluation
 For this you need to prepare the semantic ground truth and predictions in the following format 
 - one file per scene named `<scene_id>.txt`, where each line contains the
