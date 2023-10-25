@@ -11,7 +11,7 @@ import torch
 
 
 def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_label, 
-            top_k_pred=[1, 3]):
+            top_k_pred=[1, 3], eval_against_gt=False):
 
     # check if all files exist
     for scene_id in tqdm(scene_list):
@@ -34,8 +34,11 @@ def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_l
 
         assert pred.shape[0] == gt.shape[0], f'Prediction for {scene_id} does not match #GT vertices: pred={pred.shape}, GT={gt.shape}'
 
-        # assert min of preds is >= 0
-        assert pred.min() >= 0, f'Prediction for {scene_id} contains negative labels: {pred.min()}'
+        # evaluating against preds -> make sure there are no negative preds
+        # when evaluating against GT, we allow negative preds
+        if not eval_against_gt:
+            # assert min of preds is >= 0
+            assert pred.min() >= 0, f'Prediction for {scene_id} contains negative labels: {pred.min()}'
         # assert max of preds is  <= (num_classes-1)
         assert pred.max() <= (num_classes-1), f'Prediction for {scene_id} contains labels > {num_classes-1}: {pred.max()}'
 
@@ -74,13 +77,18 @@ def main(args):
     scene_ids = read_txt_list(cfg.scene_list_file)
     num_classes = len(read_txt_list(cfg.classes_file))
 
+    if cfg.preds_dir == cfg.gt_dir:
+        print('Evaluating against GT')
+        eval_against_gt = True
+    else:
+        eval_against_gt = False
+
     confmats = eval_semantic(scene_ids, cfg.preds_dir, cfg.gt_dir, cfg.data_root,
-                            num_classes, -100, [1, 3])
+                            num_classes, -100, [1, 3], eval_against_gt=eval_against_gt)
     
     for k, confmat in confmats.items():
         print(f'Top {k} mIOU: {confmat.miou}')
         print('All IoUs:', confmat.ious)
-
     
 
 if __name__ == '__main__':
