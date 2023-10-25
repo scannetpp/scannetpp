@@ -12,19 +12,27 @@ def load_ids(filename):
 # ------------ Instance Utils ------------ #
 
  # store all label related info in namespace
-def get_label_info(class_list):
+def get_label_info(semantic_class_list, instance_class_list):
     label_info = SimpleNamespace()
-    label_info.all_class_labels = class_list
-    label_info.ignore_classes = [0, 1, 2]
+    # all semantic classes
+    label_info.all_class_labels = semantic_class_list
+    # indices of semantic classes not present in instance class list
+    label_info.ignore_classes = [i for i in range(len(label_info.all_class_labels)) if label_info.all_class_labels[i] not in instance_class_list]
+    # ids of all semantic classes
     label_info.all_class_ids = list(range(len(label_info.all_class_labels)))
+    # ids of instance classes (all semantic classes - ignored classes)
     label_info.class_labels = [label_info.all_class_labels[i] for i in label_info.all_class_ids if i not in label_info.ignore_classes]
+    # ids of instance classes
     label_info.valid_class_ids = [i for i in label_info.all_class_ids if i not in label_info.ignore_classes]
+
     label_info.id_to_label = {}
     label_info.label_to_id = {}
 
     for i in range(len(label_info.valid_class_ids)):
-        label_info.label_to_id[label_info.class_labels[i]] = label_info.valid_class_ids[i]
+        # class id -> class name
         label_info.id_to_label[label_info.valid_class_ids[i]] = label_info.class_labels[i]
+        # class name -> class id
+        label_info.label_to_id[label_info.class_labels[i]] = label_info.valid_class_ids[i]
 
     return label_info
 

@@ -452,10 +452,11 @@ def main(args):
     cfg = load_yaml_munch(args.config_file)
 
     scene_ids = read_txt_list(cfg.scene_list_file)
-    class_list = read_txt_list(cfg.classes_file)
+    semantic_class_list = read_txt_list(cfg.semantic_classes_file)
+    instance_class_list = read_txt_list(cfg.instance_classes_file)
 
     # labels to evaluate on, label-id mappings
-    label_info = instance_utils.get_label_info(class_list)
+    label_info = instance_utils.get_label_info(semantic_class_list, instance_class_list)
     # evaluation parameters, can be customized
     eval_opts = instance_utils.Instance_Eval_Opts()
 
