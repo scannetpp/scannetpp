@@ -33,6 +33,7 @@ import numpy as np
 
 import semantic.utils.instance_utils as instance_utils
 from common.file_io import load_yaml_munch, read_txt_list
+from common.scene_release import ScannetppScene_Release
 
 
 def evaluate_matches(matches, label_info, eval_opts):
@@ -209,10 +210,10 @@ def compute_averages(aps, label_info, eval_opts):
     return avg_dict
 
 
-def assign_instances_for_scan(pred_file, gt_file, pred_path, label_info, eval_opts):
+def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_info, eval_opts):
     try:
         # read pred_file_path, label, conf for each instance
-        pred_info = instance_utils.read_instance_prediction_file(pred_file, pred_path)
+        pred_info = instance_utils.read_instance_prediction_file(pred_file, preds_dir)
     except Exception as e:
         print('Unable to load {pred_file}: {e}')
 
@@ -334,17 +335,27 @@ def print_results(avgs, label_info):
     print(line)
     print("")
 
-def evaluate(pred_files, gt_files, pred_path, label_info, eval_opts):
+def evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts):
     print(f'Evaluating {len(pred_files)} scans')
     matches = {}
 
-    for i in tqdm(range(len(pred_files)), desc='pred_scene'):
-        matches_key = os.path.abspath(gt_files[i])
+    for scene_ndx, pred_file in enumerate(tqdm(pred_files, desc='pred_scene')):
+        # get the scene id
+        scene_id = pred_file.stem
+
+        # create scene object to get the mesh mask
+        scene = ScannetppScene_Release(scene_id, data_root=data_root)
+        # vertices to ignore for eval
+        ignore_mask = np.loadtxt(scene.scan_mesh_mask_path, dtype=np.int32)
+
+        matches_key = os.path.abspath(gt_files[scene_ndx])
+
         # assign gt to predictions
         # gt = 1 file per scene
         # pred = 1 file per scene + 1 file per instance
-        gt2pred, pred2gt = assign_instances_for_scan(pred_files[i], gt_files[i], 
-                                                     pred_path, label_info, eval_opts)
+        gt2pred, pred2gt = assign_instances_for_scan(pred_file, gt_files[scene_ndx], 
+                                                     preds_dir, ignore_mask, 
+                                                     label_info, eval_opts)
         # for each scene, gt2pred and pred2gt
         matches[matches_key] = {
             'gt': gt2pred,
@@ -412,7 +423,7 @@ def eval_instance(scene_ids, preds_dir, gt_dir, data_root, label_info, eval_opts
         verify_pred_files(pred_files, label_info)
 
     # evaluate
-    results = evaluate(pred_files, gt_files, preds_dir, label_info, eval_opts)
+    results = evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts)
 
     return results
 
