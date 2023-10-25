@@ -213,24 +213,30 @@ def compute_averages(aps, label_info, eval_opts):
 def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_info, eval_opts):
     try:
         # read pred_file_path, label, conf for each instance
+        # dict: pred path -> dict: label_info, conf
         pred_info = instance_utils.read_instance_prediction_file(pred_file, preds_dir)
     except Exception as e:
         print('Unable to load {pred_file}: {e}')
 
     try:
         # read the GT file as an array of ints
+        # single array of GT
         gt_ids = instance_utils.load_ids(gt_file)
     except Exception as e:
         print(f'Unable to load: {gt_file}: {e}')
 
     # get gt instances
+    # GT as instance objects
+    # dict: class label -> list of instances as dict with
+    #        instance_id (1000sem+inst), label_id (semantic label), vert_count, med_dist (-1), dist_conf (0)
     gt_instances = instance_utils.get_instances(gt_ids, 
                                 label_info.valid_class_ids, label_info.class_labels, 
                                 label_info.id_to_label)
 
     # associate
+    # for each GT instance, all the matched predictions = list
     gt2pred = deepcopy(gt_instances)
-    # for each class
+    # for each GT class
     for label in gt2pred:
         # each instance in that class
         for gt in gt2pred[label]:
@@ -244,9 +250,9 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
         pred2gt[label] = []
 
     num_pred_instances = 0
-    # mask of void labels in the groundtruth
+    # mask of invalid semantic labels
     bool_void = np.logical_not(np.in1d(gt_ids//1000, label_info.valid_class_ids))
-    
+
     # go thru all prediction masks
     for pred_mask_file in pred_info:
         label_id = int(pred_info[pred_mask_file]['label_id'])

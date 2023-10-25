@@ -49,8 +49,11 @@ class Instance(object):
         # instance_id: id of the current instance = sem * 1000 + inst
         if (instance_id == -1):
             return
+        # instance id -> same as provided = sem*1000 + inst
         self.instance_id     = int(instance_id)
+        # label id -> remainder when divided by 1000 = ID of this instance
         self.label_id    = int(self.get_label_id(instance_id))
+        # number of vertices in this instance
         self.vert_count = int(self.get_instance_verts(mesh_vert_instances, instance_id))
 
     def get_label_id(self, instance_id):
