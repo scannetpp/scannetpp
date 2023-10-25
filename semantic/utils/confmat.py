@@ -43,12 +43,11 @@ class ConfMat:
     Confusion matrix that can be updated repeatedly
     and later give IoU, accuracy and the matrix itself
     '''
-    def __init__(self, num_classes, top_k_pred=1, multilabel_only=False, ignore_label=None):
+    def __init__(self, num_classes, top_k_pred=1, ignore_label=None):
         self.num_classes = num_classes
         self._mat = np.zeros((self.num_classes, self.num_classes))
         self.top_k_pred = top_k_pred
 
-        self.multilabel_only = multilabel_only
         self.ignore_label = ignore_label
         self._unique_gt = set()
 
@@ -88,13 +87,6 @@ class ConfMat:
         # make targets (n, k) and loop through each of them
         if len(targets.shape) == 1:
             targets = targets.view(-1, 1)
-
-        # eval only on samples with >1 labels
-        if self.multilabel_only:
-            has_label = targets != self.ignore_label
-            has_multilabel = has_label.sum(1) > 1
-            targets = targets[has_multilabel]
-            top_preds = top_preds[has_multilabel]
 
         # for each possible GT, compare with top-k preds
         for target_ndx in range(targets.shape[1]):
