@@ -216,14 +216,11 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
         # dict: pred path -> dict: label_info, conf
         pred_info = instance_utils.read_instance_prediction_file(pred_file, preds_dir)
     except Exception as e:
-        print('Unable to load {pred_file}: {e}')
+        raise ValueError(f'Error reading {pred_file}: {e}')
 
-    try:
-        # read the GT file as an array of ints
-        # single array of GT
-        gt_ids = instance_utils.load_ids(gt_file)
-    except Exception as e:
-        print(f'Unable to load: {gt_file}: {e}')
+    # read the GT file as an array of ints
+    # single array of GT
+    gt_ids = instance_utils.load_ids(gt_file)
 
     # dont eval on masked regions
     # keep all preds and gt except masked regions
@@ -276,8 +273,7 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
         # keep only unmasked preds
         pred_mask = pred_mask[keep_vtx]
         
-        if len(pred_mask) != len(gt_ids):
-            raise ValueError(f'Wrong number of lines in {pred_mask_file}: {len(pred_mask)} vs #mesh vertices {len(gt_ids)}, please double check and/or re-download the mesh')
+        assert len(pred_mask) == len(gt_ids), f'Wrong number of lines in {pred_mask_file}: {len(pred_mask)} vs #mesh vertices {len(gt_ids)}, please check and/or re-download the mesh'
 
         # convert to binary
         pred_mask = np.not_equal(pred_mask, 0)
@@ -368,7 +364,7 @@ def evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts):
     print(f'Evaluating {len(pred_files)} scans')
     matches = {}
 
-    for scene_ndx, pred_file in enumerate(tqdm(pred_files, desc='pred_scene')):
+    for scene_ndx, pred_file in enumerate(tqdm(pred_files, desc='assign_pred_scene')):
         # get the scene id
         scene_id = pred_file.stem
 
@@ -413,23 +409,16 @@ def verify_pred_files(pred_files, label_info):
         with open(pred_file) as f:
             lines = [l.strip().split() for l in f.readlines()]
         
-        for line_ndx, line in enumerate(tqdm(lines, desc='check_mask_file')):
+        for line_ndx, line in enumerate(tqdm(lines, desc='check_mask_file', leave=False)):
             # format should be relative path (file exists) <space> class ID (0 to C-1) <space> conf (0 to 1)
             assert len(line) == 3, f'Incorrect format in {pred_file} at line {line_ndx}'
             # check if the class ID is valid
             assert int(line[1]) in range(len(label_info.all_class_ids)), f'Invalid class ID in {pred_file} at line {line_ndx}'
             # check if the confidence is between 0 and 1
             assert 0 <= float(line[2]) <= 1, f'Invalid confidence in {pred_file} at line {line_ndx}'
-            # check if the corresponding mask file exists and it contains only 0s and 1s
+            # check if the corresponding mask file exists
             mask_file = pred_file.parent / line[0]
-            assert os.path.isfile(mask_file), f'Mask file {mask_file} does not exist'
-
-            # read the mask file
-            mask = np.loadtxt(mask_file)
-            # check if the mask file contains only 0s and 1s
-            assert np.all(np.isin(mask, [0, 1])), f'Mask file {mask_file} contains values other than 0 and 1'
-            # TODO: check if the number of mask values is the same as the number of mesh vertices?
-    
+            assert mask_file.is_file(), f'Mask file {mask_file} does not exist'
 
 def eval_instance(scene_ids, preds_dir, gt_dir, data_root, label_info, eval_opts,
                   check_pred_files=False):

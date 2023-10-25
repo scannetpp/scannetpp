@@ -90,18 +90,18 @@ def read_instance_prediction_file(filename, pred_path):
     lines = open(filename).read().splitlines()
     instance_info = {}
     abs_pred_path = os.path.abspath(pred_path)
+    
     for line in lines:
         parts = line.split(' ')
-        if len(parts) != 3:
-            print('invalid instance prediction file. Expected (per line): [rel path prediction] [label id prediction] [confidence prediction]')
-        if os.path.isabs(parts[0]):
-            print('invalid instance prediction file. First entry in line must be a relative path')
+        assert len(parts) == 3, f'Invalid instance prediction file {filename}. Expected (per line): [rel path prediction] [label id prediction] [confidence prediction]'
+        assert not os.path.isabs(parts[0]), f'Invalid instance prediction file {filename}. First entry in line must be a relative path'
+
         mask_file = os.path.join(os.path.dirname(filename), parts[0])
         mask_file = os.path.abspath(mask_file)
-        # check that mask_file lives inside prediction path
-        if os.path.commonprefix([mask_file, abs_pred_path]) != abs_pred_path:
-            print('predicted mask {} in prediction text file {} points outside of prediction path.'.format(mask_file,filename))
 
+        # check that mask_file lives inside prediction path
+        assert os.path.commonprefix([mask_file, abs_pred_path]) == abs_pred_path, \
+            'fPredicted mask {mask_file} in prediction text file {filename} points outside of prediction path'
         info            = {}
         info["label_id"] = int(float(parts[1]))
         info["conf"]    = float(parts[2])
