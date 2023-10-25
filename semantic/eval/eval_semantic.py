@@ -75,7 +75,8 @@ def main(args):
     cfg = load_yaml_munch(args.config_file)
 
     scene_ids = read_txt_list(cfg.scene_list_file)
-    num_classes = len(read_txt_list(cfg.classes_file))
+    semantic_classes = read_txt_list(cfg.classes_file) 
+    num_classes = len(semantic_classes)
 
     if cfg.preds_dir == cfg.gt_dir:
         print('Evaluating against GT')
@@ -88,7 +89,11 @@ def main(args):
     
     for k, confmat in confmats.items():
         print(f'Top {k} mIOU: {confmat.miou}')
-        print('All IoUs:', confmat.ious)
+
+        for class_name, class_iou in zip(semantic_classes, confmat.ious):
+            print(f'{class_name: <25}: {class_iou}')
+
+        print('----------------------------------------------------')
     
 
 if __name__ == '__main__':
