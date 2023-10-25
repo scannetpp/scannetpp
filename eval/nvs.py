@@ -2,6 +2,7 @@ import argparse
 from typing import List, Optional, Union
 import json
 import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -38,7 +39,6 @@ def evaluate_scene(
     """
 
     psnr_metric = PeakSignalNoiseRatio(data_range=1.0)
-    # TODO: make sure which one should be used (VGG or Alex)
     lpip_metric = LearnedPerceptualImagePatchSimilarity(
         net_type="vgg", normalize=True
     ).to(device)
@@ -48,24 +48,25 @@ def evaluate_scene(
     lpips_values = []
 
     for image_fn in image_list:
+        image_name = image_fn.split(".")[0]
         assert os.path.exists(
             os.path.join(gt_dir, image_fn)
-        ), f"GT image not found: {image_fn}"
+        ), f"{scene_id} GT image not found: {image_fn}"
         gt_image = Image.open(os.path.join(gt_dir, image_fn))
 
         pred_image_path = None
         for format in SUPPORT_IMAGE_FORMAT:
-            pred_image_path = os.path.join(pred_dir, image_fn.split(".")[0] + format)
+            pred_image_path = os.path.join(pred_dir, image_name + format)
             if os.path.exists(pred_image_path):
                 break
         if pred_image_path is None:
-            raise ValueError(
-                f"pred image not found: {image_fn} with format {' '.join(SUPPORT_IMAGE_FORMAT)}"
-            )
+            assert (
+                pred_image_path
+            ), f"{scene_id} pred image not found: {image_fn} with the following format {' '.join(SUPPORT_IMAGE_FORMAT)}"
         pred_image = Image.open(pred_image_path)
 
         if mask_dir is not None:
-            mask_path = os.path.join(mask_dir, image_fn.split(".")[0] + ".png")
+            mask_path = os.path.join(mask_dir, image_name + ".png")
             assert os.path.exists(mask_path), f"mask not found: {mask_path}"
             mask = Image.open(mask_path)
             mask = torch.from_numpy(np.array(mask))
@@ -73,17 +74,20 @@ def evaluate_scene(
             assert (
                 len(mask.shape) == 2
             ), f"mask should have 2 channels (H, W) but get shape: {mask.shape}"
+            assert (
+                mask.shape[0] == gt_image.size[1] and mask.shape[1] == gt_image.size[0]
+            ), f"mask shape {mask.shape} does not match GT image size: {gt_image.size}"
         else:
             mask = None
 
         if gt_image.size != pred_image.size:
             if auto_resize:
                 # Auto resized to match the GT image size
-                pred_image = pred_image.resize(gt_image.size)
+                pred_image = pred_image.resize(gt_image.size, Image.BICUBIC)
             else:
-                raise ValueError(
-                    f"GT and pred images have different sizes: {gt_image.size} != {pred_image.size}"
-                )
+                assert (
+                    False
+                ), f"GT and pred images have different sizes: {gt_image.size} != {pred_image.size}"
 
         gt_image = torch.from_numpy(np.array(gt_image)).float() / 255.0
         pred_image = torch.from_numpy(np.array(pred_image)).float() / 255.0
@@ -96,8 +100,6 @@ def evaluate_scene(
 
         gt_image = gt_image.permute(2, 0, 1).unsqueeze(0)
         pred_image = pred_image.permute(2, 0, 1).unsqueeze(0)
-        # pred_image += torch.rand_like(pred_image) * 1e-2
-        # pred_image = torch.clamp(pred_image, 0.0, 1.0)
 
         if mask is not None:
             valid_gt = torch.masked_select(gt_image, mask).view(3, -1)
@@ -117,18 +119,18 @@ def evaluate_scene(
             psnr = psnr_metric(pred_image, gt_image)
         ssim = structural_similarity_index_measure(pred_image, gt_image)
         lpips = lpip_metric(pred_image.to(device), gt_image.to(device))
-        # Save the images for debugging
-        pred_image = pred_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
-        gt_image = gt_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        # # Save the images for debugging
+        # pred_image = pred_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
+        # gt_image = gt_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
 
-        os.makedirs(os.path.join("/tmp/val_debug", scene_id, "pred"), exist_ok=True)
-        os.makedirs(os.path.join("/tmp/val_debug", scene_id, "gt"), exist_ok=True)
-        Image.fromarray((pred_image * 255).astype(np.uint8)).save(
-            os.path.join("/tmp/val_debug", scene_id, "pred", image_fn)
-        )
-        Image.fromarray((gt_image * 255).astype(np.uint8)).save(
-            os.path.join("/tmp/val_debug", scene_id, "gt", image_fn)
-        )
+        # os.makedirs(os.path.join("/tmp/val_debug", scene_id, "pred"), exist_ok=True)
+        # os.makedirs(os.path.join("/tmp/val_debug", scene_id, "gt"), exist_ok=True)
+        # Image.fromarray((pred_image * 255).astype(np.uint8)).save(
+        #     os.path.join("/tmp/val_debug", scene_id, "pred", image_fn)
+        # )
+        # Image.fromarray((gt_image * 255).astype(np.uint8)).save(
+        #     os.path.join("/tmp/val_debug", scene_id, "gt", image_fn)
+        # )
 
         psnr_values.append(psnr.item())
         ssim_values.append(ssim.item())
@@ -156,6 +158,7 @@ def get_test_images(transforms_path: str):
 
 
 def evaluate_all(data_root, pred_dir, scene_list):
+    all_images = []
     all_psnr = []
     all_ssim = []
     all_lpips = []
@@ -163,7 +166,7 @@ def evaluate_all(data_root, pred_dir, scene_list):
     for scene_id in scene_list:
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
-        print(image_list)
+        # print(image_list)
 
         scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
             Path(pred_dir) / scene_id,
@@ -174,10 +177,11 @@ def evaluate_all(data_root, pred_dir, scene_list):
             scene_id=scene_id,
             verbose=True,
         )
-        all_psnr += scene_psnr
-        all_ssim += scene_ssim
-        all_lpips += scene_lpips
-    return all_psnr, all_ssim, all_lpips
+        all_psnr.append(scene_psnr)
+        all_ssim.append(scene_ssim)
+        all_lpips.append(scene_lpips)
+        all_images.append(image_list)
+    return all_images, all_psnr, all_ssim, all_lpips
 
 
 def main(args):
@@ -188,7 +192,7 @@ def main(args):
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes]
 
-    all_psnr, all_ssim, all_lpips = evaluate_all(
+    all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
         args.data_root, args.pred_dir, val_scenes
     )
     print(f"Overall PSNR: {np.mean(all_psnr):.4f} +/- {np.std(all_psnr):.4f}")
