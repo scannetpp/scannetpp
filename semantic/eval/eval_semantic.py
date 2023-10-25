@@ -13,11 +13,17 @@ import torch
 def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_label, 
             top_k_pred=[1, 3]):
 
+    # check if all files exist
+    for scene_id in tqdm(scene_list):
+        assert (Path(pred_dir) / f'{scene_id}.txt').is_file(), f'Pred file {scene_id}.txt not found'
+
     # create one confmat for each k
     confmats = {k: 
         ConfMat(num_classes, top_k_pred=k, ignore_label=ignore_label)
         for k in top_k_pred
     }
+
+    max_k = max(top_k_pred)
 
     # go through each scene
     for scene_id in tqdm(scene_list):
@@ -26,12 +32,22 @@ def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_l
         # read the predictions N, or N,3 (usually)
         pred = np.loadtxt(Path(pred_dir) / f'{scene_id}.txt', dtype=np.int32, delimiter=',')
 
+        assert pred.shape[0] == gt.shape[0], f'Prediction for {scene_id} does not match #GT vertices: pred={pred.shape}, GT={gt.shape}'
+
+        # assert min of preds is >= 0
+        assert pred.min() >= 0, f'Prediction for {scene_id} contains negative labels: {pred.min()}'
+        # assert max of preds is  <= (num_classes-1)
+        assert pred.max() <= (num_classes-1), f'Prediction for {scene_id} contains labels > {num_classes-1}: {pred.max()}'
+
         # convert to torch tensors
         pred = torch.LongTensor(pred)
 
-        # single prediction? repeat to make it N, max(top_k_pred)
+        # prediction should be N, or N,k_max currently, assert this
+        assert len(pred.shape) == 1 or pred.shape[1] == max_k, f'Prediction shape {pred.shape} not supported'
+
+        # single prediction? repeat to make it N, max_k
         if len(pred.shape) == 1:
-            pred = pred.reshape(-1, 1).repeat(1, max(top_k_pred))
+            pred = pred.reshape(-1, 1).repeat(1, max_k)
 
         gt = torch.LongTensor(gt)
 
