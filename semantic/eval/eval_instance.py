@@ -358,8 +358,38 @@ def evaluate(pred_files, gt_files, pred_path, label_info, eval_opts):
 
     return avgs
 
+def verify_pred_files(pred_files, label_info):
+    '''
+    Check the pred files provided by the user for consistency
+    raise error if files are not in the correct format
+    '''
+    # go through each main file
+    for pred_file in tqdm(pred_files, desc='check_pred_files'):
+        # check if the format is correct
+        # read the file
+        with open(pred_file) as f:
+            lines = [l.strip().split() for l in f.readlines()]
+        
+        for line_ndx, line in enumerate(tqdm(lines, desc='check_mask_file')):
+            # format should be relative path (file exists) <space> class ID (0 to C-1) <space> conf (0 to 1)
+            assert len(line) == 3, f'Incorrect format in {pred_file} at line {line_ndx}'
+            # check if the class ID is valid
+            assert int(line[1]) in range(len(label_info.all_class_ids)), f'Invalid class ID in {pred_file} at line {line_ndx}'
+            # check if the confidence is between 0 and 1
+            assert 0 <= float(line[2]) <= 1, f'Invalid confidence in {pred_file} at line {line_ndx}'
+            # check if the corresponding mask file exists and it contains only 0s and 1s
+            mask_file = pred_file.parent / line[0]
+            assert os.path.isfile(mask_file), f'Mask file {mask_file} does not exist'
 
-def eval_instance(scene_ids, preds_dir, gt_dir, data_root, label_info, eval_opts):
+            # read the mask file
+            mask = np.loadtxt(mask_file)
+            # check if the mask file contains only 0s and 1s
+            assert np.all(np.isin(mask, [0, 1])), f'Mask file {mask_file} contains values other than 0 and 1'
+            # TODO: check if the number of mask values is the same as the number of mesh vertices?
+    
+
+def eval_instance(scene_ids, preds_dir, gt_dir, data_root, label_info, eval_opts,
+                  check_pred_files=False):
     preds_dir = Path(preds_dir)
     gt_dir = Path(gt_dir)
 
@@ -378,6 +408,9 @@ def eval_instance(scene_ids, preds_dir, gt_dir, data_root, label_info, eval_opts
         pred_files.append(pred_file)
         gt_files.append(gt_file)
 
+    if check_pred_files:
+        verify_pred_files(pred_files, label_info)
+
     # evaluate
     results = evaluate(pred_files, gt_files, preds_dir, label_info, eval_opts)
 
@@ -394,8 +427,9 @@ def main(args):
     # evaluation parameters, can be customized
     eval_opts = instance_utils.Instance_Eval_Opts()
 
+    # TODO: catch assertion errors and re-raise as custom errors
     results = eval_instance(scene_ids, cfg.preds_dir, cfg.gt_dir, cfg.data_root,
-                            label_info, eval_opts)
+                            label_info, eval_opts, cfg.check_pred_files)
     # print everything
     print_results(results, label_info)
 

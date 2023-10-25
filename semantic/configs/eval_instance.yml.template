@@ -7,3 +7,5 @@ preds_dir: <path to preds>/preds
 data_root: <path to data>/data
 
 classes_file: <path to data>/metadata/semantic_classes.txt
+
+check_pred_files: true
