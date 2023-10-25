@@ -225,6 +225,15 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
     except Exception as e:
         print(f'Unable to load: {gt_file}: {e}')
 
+    # dont eval on masked regions
+    # keep all preds and gt except masked regions
+    vtx_ndx = np.arange(len(gt_ids))
+    # vertices to keep
+    keep_vtx = ~np.isin(vtx_ndx, ignore_mask)
+
+    # keep only unmasked GT
+    gt_ids = gt_ids[keep_vtx]
+
     # get gt instances
     # GT as instance objects
     # dict: class label -> list of instances as dict with
@@ -255,6 +264,7 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
 
     # go thru all prediction masks
     for pred_mask_file in pred_info:
+        # get the sem label and conf for pred
         label_id = int(pred_info[pred_mask_file]['label_id'])
         conf = pred_info[pred_mask_file]['conf']
 
@@ -263,45 +273,58 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
 
         label_name = label_info.id_to_label[label_id]
         pred_mask = instance_utils.load_ids(pred_mask_file)
+        # keep only unmasked preds
+        pred_mask = pred_mask[keep_vtx]
         
         if len(pred_mask) != len(gt_ids):
             raise ValueError(f'Wrong number of lines in {pred_mask_file}: {len(pred_mask)} vs #mesh vertices {len(gt_ids)}, please double check and/or re-download the mesh')
 
         # convert to binary
         pred_mask = np.not_equal(pred_mask, 0)
+
         num = np.count_nonzero(pred_mask)
 
         # dont have enough vertices with indices
         if num < eval_opts.min_region_sizes[0]:
             continue  # skip if empty
 
-        # create a new instance
+        # create a new instance dict
         pred_instance = {}
         pred_instance['filename'] = pred_mask_file
-        # assign a new id
+        # assign a new id, keep incrementing
         pred_instance['pred_id'] = num_pred_instances
-        # 
+        num_pred_instances += 1
+        # semantic class ID
         pred_instance['label_id'] = label_id
+        # num vertices in this pred instance
         pred_instance['vert_count'] = num
+        # predicted confidence
         pred_instance['confidence'] = conf
+        # places where the semantic class is invalid
         pred_instance['void_intersection'] = np.count_nonzero(np.logical_and(bool_void, pred_mask))
 
         # matched gt instances
         matched_gt = []
         # go thru all gt instances with matching label
         for (gt_num, gt_inst) in enumerate(gt2pred[label_name]):
-            intersection = np.count_nonzero(np.logical_and(gt_ids == gt_inst['instance_id'], pred_mask))
+            # intersection of gt mask and pred mask
+            gt_mask = gt_ids == gt_inst['instance_id']
+            intersection = np.count_nonzero(np.logical_and(gt_mask, pred_mask))
             if intersection > 0:
                 gt_copy = gt_inst.copy()
                 pred_copy = pred_instance.copy()
                 gt_copy['intersection']   = intersection
                 pred_copy['intersection'] = intersection
+                # add to list of all matched GT for this pred
                 matched_gt.append(gt_copy)
+                # add pred as match to GT
                 gt2pred[label_name][gt_num]['matched_pred'].append(pred_copy)
+        # all matched GT for this pred
         pred_instance['matched_gt'] = matched_gt
-        num_pred_instances += 1
         pred2gt[label_name].append(pred_instance)
 
+    # pred2gt: pred instances + matched GT for each pred
+    # gt2pred: GT instances + matched pred for each GT
     return gt2pred, pred2gt
 
 def print_results(avgs, label_info):
@@ -359,6 +382,9 @@ def evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts):
         # assign gt to predictions
         # gt = 1 file per scene
         # pred = 1 file per scene + 1 file per instance
+        # output: 
+        # pred2gt: pred instances as dicts + matched GT for each pred
+        # gt2pred: GT instances as dict + matched pred for each GT
         gt2pred, pred2gt = assign_instances_for_scan(pred_file, gt_files[scene_ndx], 
                                                      preds_dir, ignore_mask, 
                                                      label_info, eval_opts)
