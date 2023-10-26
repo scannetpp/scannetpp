@@ -1,7 +1,7 @@
 '''
 Prepare training data for 3D semantic and instance segmentation tasks
 by mapping raw labels to the benchmarks classes
-and sampling points on the mesh to get the vertices on these
+and sampling points on the mesh to get the labels on these
 '''
 
 import argparse
