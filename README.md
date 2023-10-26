@@ -99,6 +99,12 @@ Then run
 python -m semantic.eval.eval_semantic semantic/configs/eval_semantic.yml
 ```
 
+## Visualize training data
+
+```
+python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
+```
+
 ## 3D Instance Segmentation Evaluation
 
 See `semantic/eval/eval_instance.py` for details on the input formats.
