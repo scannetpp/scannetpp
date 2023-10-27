@@ -53,3 +53,22 @@ The rendered depth maps are single-channel uint16 png, where the unit is mm and 
 ```
 python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ```
+
+
+## Evaluation
+The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
+
+### Novel View Synthesis
+The results should be saved in the following structure:
+```
+SCENE_ID0/
+├── DSC00001.JPG
+├── DSC00002.JPG
+├── ...
+SCENE_ID1/
+├── ...
+```
+
+```
+
+```
