@@ -1,0 +1,24 @@
+
+ignore_label: -100
+# viz on point cloud? use points from PTH data
+viz_pc: true
+viz_mesh: false
+
+# use sampled_ or vtx_ properties?
+use_sampled: true
+
+# viz on mesh? load mesh separately
+data_root: <data root>
+
+viz_semantic: true
+viz_instances: true
+
+scene_list: <file containing scene IDs>
+pth_dir: <PTH data dir>
+out_dir: <output dir for PCs>
+
+output_suffix:
+  semantic: _gt_sem 
+  instance: _gt_inst
+
+palette_path: <path to palette of RGB colors>

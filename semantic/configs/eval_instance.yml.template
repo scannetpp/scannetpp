@@ -1,0 +1,12 @@
+
+scene_list_file: <path to data>/splits/nvs_sem_val.txt
+
+gt_dir: <path to gt>/gt
+preds_dir: <path to preds>/preds
+
+data_root: <path to data>/data
+
+semantic_classes_file: <path to data>/metadata/semantic_classes.txt
+instance_classes_file: <path to data>/metadata/instance_classes.txt
+
+check_pred_files: true
