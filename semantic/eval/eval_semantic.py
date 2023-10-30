@@ -9,6 +9,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+import warnings
+
 
 def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_label, 
             top_k_pred=[1, 3], eval_against_gt=False):
@@ -57,7 +59,9 @@ def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_l
         # create scene object to get the mesh mask
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         # vertices to ignore for eval
-        ignore_vtx = torch.LongTensor(np.loadtxt(scene.scan_mesh_mask_path, dtype=np.int32))
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, append=1)
+            ignore_vtx = torch.LongTensor(np.loadtxt(scene.scan_mesh_mask_path, dtype=np.int32))
 
         # dont eval on masked regions
         # keep all preds and gt except masked regions
