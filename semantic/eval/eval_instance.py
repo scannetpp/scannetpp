@@ -35,72 +35,111 @@ import semantic.utils.instance_utils as instance_utils
 from common.file_io import load_yaml_munch, read_txt_list
 from common.scene_release import ScannetppScene_Release
 
+import warnings
+
 
 def evaluate_matches(matches, label_info, eval_opts):
+    '''
+    matches['scene_id'] = {
+        'gt': gt2pred = gt instances, pred for each of them
+        'pred': pred2gt = pred instance, gt for each of them
+    }
+    '''
+    # 0.5, 0.55 .. 0.9, 0.25
     overlaps = eval_opts.overlaps
+    # [100]
     min_region_sizes = [ eval_opts.min_region_sizes[0] ]
+    # [inf]
     dist_threshes = [ eval_opts.distance_threshes[0] ]
+    # [-inf]
     dist_confs = [ eval_opts.distance_confs[0] ]
-    
-    # results: class x overlap
+
+    # results: dist_thresh x class x overlap
+    # label_info.class_labels = only instance classes
     ap = np.zeros( (len(dist_threshes) , len(label_info.class_labels) , len(overlaps)) , float )
-    for di, (min_region_size, distance_thresh, distance_conf) in enumerate(zip(min_region_sizes, dist_threshes, dist_confs)):
+    # need same number of min_region_sizes, dist_threshes, dist_confs
+    for di, (min_region_size, distance_thresh, distance_conf) in \
+            enumerate(zip(min_region_sizes, dist_threshes, dist_confs)):
         # for each overlap
-        for oi, overlap_th in enumerate(overlaps):
+        # repeat over multiple values
+        for oi, overlap_th in enumerate(tqdm(overlaps, desc='overlap', leave=False)):
             pred_visited = {}
+            # m = GT file/scene
             for m in matches:
+                # each pred for this scene
                 for p in matches[m]['pred']:
+                    # each class
                     for label_name in label_info.class_labels:
+                        # preds in this class
                         for p in matches[m]['pred'][label_name]:
+                            # a single pred, has a file -> mark as not visited
                             if 'filename' in p:
                                 pred_visited[p['filename']] = False
-            # each class
-            for li, label_name in enumerate(label_info.class_labels):
+            # go through each class
+            for li, label_name in enumerate(tqdm(label_info.class_labels, desc='class', leave=False)):
+                # over all scenes
                 y_true = np.empty(0)
                 y_score = np.empty(0)
                 hard_false_negatives = 0
                 has_gt = False
                 has_pred = False
-                # each match
-                for m in matches:
+                # each scene
+                for m in tqdm(matches, desc='scene', leave=False):
+                    # all preds in this scene
                     pred_instances = matches[m]['pred'][label_name]
+                    # all gt in this scene
                     gt_instances = matches[m]['gt'][label_name]
                     # filter groups in ground truth
-                    gt_instances = [ gt for gt in gt_instances if gt['instance_id']>=1000 and gt['vert_count']>=min_region_size and gt['med_dist']<=distance_thresh and gt['dist_conf']>=distance_conf ]
+                    gt_instances = [ gt for gt in gt_instances \
+                                    if gt['instance_id']>=1000 \
+                                        and gt['vert_count']>=min_region_size \
+                                        and gt['med_dist']<=distance_thresh \
+                                        and gt['dist_conf']>=distance_conf 
+                                    ]
+                    
                     if gt_instances:
                         has_gt = True
                     if pred_instances:
                         has_pred = True
 
+                    # for each GT
+                    # initialize with 1s
                     cur_true  = np.ones ( len(gt_instances) )
                     cur_score = np.ones ( len(gt_instances) ) * (-float("inf"))
                     cur_match = np.zeros( len(gt_instances) , dtype=bool )
-                    # collect matches
-                    for (gti,gt) in enumerate(gt_instances):
+
+                    # go through each GT instance, collect matches
+                    # gtindex, gt instance
+                    for (gti, gt) in enumerate(gt_instances):
                         found_match = False
-                        num_pred = len(gt['matched_pred'])
+                        # each potential match to this GT                        
                         for pred in gt['matched_pred']:
                             # greedy assignments
+                            # already visited this pred, skip
                             if pred_visited[pred['filename']]:
                                 continue
+                            # overlap between this gt instance and pred
                             overlap = float(pred['intersection']) / (gt['vert_count']+pred['vert_count']-pred['intersection'])
+                            
                             if overlap > overlap_th:
                                 confidence = pred['confidence']
                                 # if already have a prediction for this gt,
                                 # the prediction with the lower score is automatically a false positive
                                 if cur_match[gti]:
-                                    max_score = max( cur_score[gti] , confidence )
-                                    min_score = min( cur_score[gti] , confidence )
+                                    max_score = max( cur_score[gti], confidence )
+                                    min_score = min( cur_score[gti], confidence )
                                     cur_score[gti] = max_score
                                     # append false positive
-                                    cur_true  = np.append(cur_true,0)
-                                    cur_score = np.append(cur_score,min_score)
-                                    cur_match = np.append(cur_match,True)
-                                # otherwise set score
+                                    # set to 0 
+                                    cur_true  = np.append(cur_true ,0)
+                                    cur_score = np.append(cur_score, min_score)
+                                    cur_match = np.append(cur_match, True)
+                                # otherwise found a match, set score
                                 else:
                                     found_match = True
                                     cur_match[gti] = True
                                     cur_score[gti] = confidence
+                                    # mark pred as visited
                                     pred_visited[pred['filename']] = True
                         if not found_match:
                             hard_false_negatives += 1
@@ -109,15 +148,21 @@ def evaluate_matches(matches, label_info, eval_opts):
                     cur_score = cur_score[ cur_match==True ]
 
                     # collect non-matched predictions as false positive
+                    # go through all preds in scene
                     for pred in pred_instances:
                         found_gt = False
+                        # potential matching gt for this pred
                         for gt in pred['matched_gt']:
                             overlap = float(gt['intersection']) / (gt['vert_count']+pred['vert_count']-gt['intersection'])
+                            # if overlap is greater than threshold, found a match
                             if overlap > overlap_th:
                                 found_gt = True
                                 break
+                        # cant match any GT
                         if not found_gt:
+                            # how much the pred is invalid semantic labels
                             num_ignore = pred['void_intersection']
+
                             for gt in pred['matched_gt']:
                                 # group?
                                 if gt['instance_id'] < 1000:
@@ -125,34 +170,44 @@ def evaluate_matches(matches, label_info, eval_opts):
                                 # small ground truth instances
                                 if gt['vert_count'] < min_region_size or gt['med_dist']>distance_thresh or gt['dist_conf']<distance_conf:
                                     num_ignore += gt['intersection']
+                            # how much of the instance is invalid
                             proportion_ignore = float(num_ignore)/pred['vert_count']
+
                             # if not ignored append false positive
                             if proportion_ignore <= overlap_th:
-                                cur_true = np.append(cur_true,0)
+                                cur_true = np.append(cur_true, 0)
                                 confidence = pred["confidence"]
-                                cur_score = np.append(cur_score,confidence)
+                                cur_score = np.append(cur_score, confidence)
 
                     # append to overall results
-                    y_true  = np.append(y_true,cur_true)
-                    y_score = np.append(y_score,cur_score)
+                    y_true  = np.append(y_true, cur_true)
+                    y_score = np.append(y_score, cur_score)
 
+
+                # for each class, (dist_thresh, min_region_size, overlap)
                 # compute average precision
                 if has_gt and has_pred:
                     # compute precision recall curve first
-                    # sorting and cumsum
+                    # get sorting indices
                     score_arg_sort      = np.argsort(y_score)
+                    # sort the scores
                     y_score_sorted      = y_score[score_arg_sort]
+                    # 0/1, sort in the same order as y_score
                     y_true_sorted       = y_true[score_arg_sort]
+                    # cumulative sum of y_true after sorted = 1,2,3,4 .. 
                     y_true_sorted_cumsum = np.cumsum(y_true_sorted)
 
-                    # unique thresholds
-                    (thresholds, unique_indices) = np.unique( y_score_sorted , return_index=True )
+                    # indices of unique scores
+                    (_, unique_indices) = np.unique( y_score_sorted , return_index=True )
                     num_prec_recall = len(unique_indices) + 1
 
                     # prepare precision recall
                     num_examples      = len(y_score_sorted)
 
-                    num_true_examples = y_true_sorted_cumsum[-1]
+                    if len(y_true_sorted_cumsum) > 0:
+                        num_true_examples = y_true_sorted_cumsum[-1]
+                    else:
+                        num_true_examples = 0
 
                     precision         = np.zeros(num_prec_recall)
                     recall            = np.zeros(num_prec_recall)
@@ -370,8 +425,11 @@ def evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts):
 
         # create scene object to get the mesh mask
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
+
         # vertices to ignore for eval
-        ignore_mask = np.loadtxt(scene.scan_mesh_mask_path, dtype=np.int32)
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, append=1)
+            ignore_mask = np.loadtxt(scene.scan_mesh_mask_path, dtype=np.int32)
 
         matches_key = os.path.abspath(gt_files[scene_ndx])
 
@@ -392,6 +450,7 @@ def evaluate(pred_files, gt_files, preds_dir, data_root, label_info, eval_opts):
 
     # get scores
     # does the greedy assignment
+    # evaluate all scenes together
     ap_scores = evaluate_matches(matches, label_info, eval_opts)
     avgs = compute_averages(ap_scores, label_info, eval_opts)
 
