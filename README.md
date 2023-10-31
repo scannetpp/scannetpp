@@ -85,6 +85,12 @@ Then run
 python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_data.yml
 ```
 
+## Visualize training data
+
+```
+python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
+```
+
 ## 3D Semantic Segmentation Evaluation
 For this you need to prepare the semantic ground truth and predictions in the following format 
 - one file per scene named `<scene_id>.txt`, where each line contains the
@@ -97,12 +103,6 @@ Configure the paths to GT, predictions, label list and downloaded data in `seman
 Then run 
 ```
 python -m semantic.eval.eval_semantic semantic/configs/eval_semantic.yml
-```
-
-## Visualize training data
-
-```
-python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ## 3D Instance Segmentation Evaluation
