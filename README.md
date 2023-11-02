@@ -55,23 +55,6 @@ python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ```
 
 
-## Evaluation
-The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
-
-### Novel View Synthesis
-The results should be saved in the following structure:
-```
-SCENE_ID0/
-├── DSC00001.JPG
-├── DSC00002.JPG
-├── ...
-SCENE_ID1/
-├── ...
-```
-
-```
-
-```
 # Semantics
 
 ## Prepare 3D Semantics Training Data
@@ -92,7 +75,7 @@ python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ## 3D Semantic Segmentation Evaluation
-For this you need to prepare the semantic ground truth and predictions in the following format 
+For this you need to prepare the semantic ground truth and predictions in the following format
 - one file per scene named `<scene_id>.txt`, where each line contains the
 label(s) for the corresponding vertex in the mesh. You can specify either a single label
 or multiple comma-separate labels in each line. Each line should have the same number of labels, i.e
@@ -100,7 +83,7 @@ each file should be an `N x 1` or `N x 3` array for 1 and 3 predictions respecti
 
 Configure the paths to GT, predictions, label list and downloaded data in `semantic/configs/eval_semantic.yml`
 
-Then run 
+Then run
 ```
 python -m semantic.eval.eval_semantic semantic/configs/eval_semantic.yml
 ```
@@ -115,3 +98,25 @@ Then run
 ```
 python -m semantic.eval.eval_instance semantic/configs/eval_instance.yml
 ```
+
+# Novel View Synthesis
+## Novel View Synthesis Evaluation (DSLR)
+The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
+
+
+```
+python -m eval.nvs --data_root DATA_ROOT --split SPLIT_FILE --pred_dir PRED_DIR
+```
+
+The PRED_DIR should have the following structure:
+```
+SCENE_ID0/
+├── DSC00001.JPG
+├── DSC00002.JPG
+├── ...
+SCENE_ID1/
+├── ...
+```
+
+NOTE:
+The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.

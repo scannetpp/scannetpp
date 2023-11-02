@@ -59,10 +59,9 @@ def evaluate_scene(
             pred_image_path = os.path.join(pred_dir, image_name + format)
             if os.path.exists(pred_image_path):
                 break
-        if pred_image_path is None:
-            assert (
-                pred_image_path
-            ), f"{scene_id} pred image not found: {image_fn} with the following format {' '.join(SUPPORT_IMAGE_FORMAT)}"
+        assert (
+            pred_image_path is not None
+        ), f"{scene_id} pred image not found: {image_fn} with the following format {' '.join(SUPPORT_IMAGE_FORMAT)}"
         pred_image = Image.open(pred_image_path)
 
         if mask_dir is not None:
@@ -117,7 +116,7 @@ def evaluate_scene(
                 )
         else:
             psnr = psnr_metric(pred_image, gt_image)
-        ssim = structural_similarity_index_measure(pred_image, gt_image)
+        ssim = structural_similarity_index_measure(pred_image, gt_image, data_range=1.0)
         lpips = lpip_metric(pred_image.to(device), gt_image.to(device))
         # # Save the images for debugging
         # pred_image = pred_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
@@ -162,6 +161,14 @@ def evaluate_all(data_root, pred_dir, scene_list):
     all_psnr = []
     all_ssim = []
     all_lpips = []
+
+    for scene_id in scene_list:
+        assert (
+            Path(pred_dir) / scene_id
+        ).exists(), f"Prediction dir of scene {scene_id} does not exist"
+        assert (
+            os.listdir(Path(pred_dir) / scene_id) > 0
+        ), f"Prediction dir of scene {scene_id} is empty"
 
     for scene_id in scene_list:
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
