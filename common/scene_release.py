@@ -15,6 +15,11 @@ class ScannetppScene_Release:
     def scene_id(self):
         return self._scene_id
 
+    # dir containing all data for this scene
+    @property
+    def scene_root_dir(self):
+        return self.data_root / self._scene_id
+
     ##### scan assets #####
     @property
     def scans_dir(self):
