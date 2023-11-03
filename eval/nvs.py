@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 import torch
 from torchmetrics.image import PeakSignalNoiseRatio
-from torchmetrics.functional.image.ssim import structural_similarity_index_measure
+from torchmetrics.image import StructuralSimilarityIndexMeasure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 from common.scene_release import ScannetppScene_Release
@@ -26,6 +26,13 @@ def evaluate_scene(
     auto_resize: bool = True,
     scene_id: str = "unknown",
     verbose: bool = False,
+    psnr_metric: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=1.0),
+    ssim_metric: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
+        data_range=1.0
+    ),
+    lpips_metric: LearnedPerceptualImagePatchSimilarity = LearnedPerceptualImagePatchSimilarity(
+        net_type="vgg", normalize=True
+    ),
     device="cpu",
 ):
     """Evaluate a scene using PSNR, SSIM and LPIPS metrics.
@@ -38,11 +45,6 @@ def evaluate_scene(
         scene_id: Scene identifier for verbose print.
         verbose: If True, print the metrics.
     """
-
-    psnr_metric = PeakSignalNoiseRatio(data_range=1.0)
-    lpip_metric = LearnedPerceptualImagePatchSimilarity(
-        net_type="vgg", normalize=True
-    ).to(device)
 
     psnr_values = []
     ssim_values = []
@@ -57,8 +59,9 @@ def evaluate_scene(
 
         pred_image_path = None
         for format in SUPPORT_IMAGE_FORMAT:
-            pred_image_path = os.path.join(pred_dir, image_name + format)
-            if os.path.exists(pred_image_path):
+            test_image_path = os.path.join(pred_dir, image_name + format)
+            if os.path.exists(test_image_path):
+                pred_image_path = test_image_path
                 break
         assert (
             pred_image_path is not None
@@ -69,7 +72,7 @@ def evaluate_scene(
             mask_path = os.path.join(mask_dir, image_name + ".png")
             assert os.path.exists(mask_path), f"mask not found: {mask_path}"
             mask = Image.open(mask_path)
-            mask = torch.from_numpy(np.array(mask))
+            mask = torch.from_numpy(np.array(mask)).to(device)
             mask = (mask > 0).bool()
             assert (
                 len(mask.shape) == 2
@@ -90,7 +93,9 @@ def evaluate_scene(
                 ), f"GT and pred images have different sizes: {gt_image.size} != {pred_image.size}"
 
         gt_image = torch.from_numpy(np.array(gt_image)).float() / 255.0
+        gt_image = gt_image.to(device)
         pred_image = torch.from_numpy(np.array(pred_image)).float() / 255.0
+        pred_image = pred_image.to(device)
         assert (
             len(gt_image.shape) == 3
         ), f"GT image should have 3 channels (H, W, 3) but get shape: {gt_image.shape}"
@@ -117,8 +122,8 @@ def evaluate_scene(
                 )
         else:
             psnr = psnr_metric(pred_image, gt_image)
-        ssim = structural_similarity_index_measure(pred_image, gt_image, data_range=1.0)
-        lpips = lpip_metric(pred_image.to(device), gt_image.to(device))
+        ssim = ssim_metric(pred_image, gt_image)
+        lpips = lpips_metric(pred_image, gt_image)
         # # Save the images for debugging
         # pred_image = pred_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
         # gt_image = gt_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
@@ -163,7 +168,7 @@ def scene_has_mask(transforms_path: str):
     return transforms["has_mask"]
 
 
-def evaluate_all(data_root, pred_dir, scene_list):
+def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
     all_images = []
     all_psnr = []
     all_ssim = []
@@ -182,8 +187,14 @@ def evaluate_all(data_root, pred_dir, scene_list):
             image_list
         ), f"Prediction dir of scene {scene_id} should have {len(image_list)} images instead of {num_images_pred}"
 
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
+    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
+    lpip_metric = LearnedPerceptualImagePatchSimilarity(
+        net_type="vgg", normalize=True
+    ).to(device)
+
     for i, scene_id in enumerate(scene_list):
-        print(f"({i+1} / {len(scene_list)} scene_id: {scene_id}")
+        print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
         # print(image_list)
@@ -199,6 +210,10 @@ def evaluate_all(data_root, pred_dir, scene_list):
             auto_resize=True,
             scene_id=scene_id,
             verbose=True,
+            psnr_metric=psnr_metric,
+            ssim_metric=ssim_metric,
+            lpip_metric=lpip_metric,
+            device=device,
         )
         all_psnr.append(scene_psnr)
         all_ssim.append(scene_ssim)
@@ -214,10 +229,16 @@ def main(args):
         with open(args.split, "r") as f:
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes if len(x.strip()) > 0]
-
+    print(val_scenes)
+    if args.device == "cuda" and not torch.cuda.is_available():
+        args.device = "cpu"
     all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
-        args.data_root, args.pred_dir, val_scenes
+        args.data_root, args.pred_dir, val_scenes, args.device
     )
+    # Flatten the lists
+    all_psnr = np.concatenate(all_psnr)
+    all_ssim = np.concatenate(all_ssim)
+    all_lpips = np.concatenate(all_lpips)
     print(f"Overall PSNR: {np.mean(all_psnr):.4f} +/- {np.std(all_psnr):.4f}")
     print(f"Overall SSIM: {np.mean(all_ssim):.4f} +/- {np.std(all_ssim):.4f}")
     print(f"Overall LPIPS: {np.mean(all_lpips):.4f} +/- {np.std(all_lpips):.4f}")
@@ -239,6 +260,7 @@ if __name__ == "__main__":
         default=None,
     )
     p.add_argument("--pred_dir", help="Model prediction", required=True)
+    p.add_argument("--device", help="Device", default="cuda")
     args = p.parse_args()
     main(args)
 
