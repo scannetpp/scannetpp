@@ -25,7 +25,6 @@ def fast_hist_top_k(top_preds, label, num_classes):
     # set the prediction as the GT for these
     pred[hits] = label[hits]
     # use the top prediction everywhere else
-    # TODO: spread out the prediction across the top k preds?
     pred[~hits] = top_preds[~hits][:, 0]
 
     flat = np.bincount(num_classes * label.astype(int) + pred, minlength=num_classes**2)
