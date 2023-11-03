@@ -156,6 +156,12 @@ def get_test_images(transforms_path: str):
     return image_list
 
 
+def scene_has_mask(transforms_path: str):
+    with open(transforms_path, "r") as f:
+        transforms = json.load(f)
+    return transforms["has_mask"]
+
+
 def evaluate_all(data_root, pred_dir, scene_list):
     all_images = []
     all_psnr = []
@@ -166,9 +172,14 @@ def evaluate_all(data_root, pred_dir, scene_list):
         assert (
             Path(pred_dir) / scene_id
         ).exists(), f"Prediction dir of scene {scene_id} does not exist"
-        assert (
-            os.listdir(Path(pred_dir) / scene_id) > 0
-        ), f"Prediction dir of scene {scene_id} is empty"
+        num_images_pred = len(os.listdir(Path(pred_dir) / scene_id))
+        assert num_images_pred > 0, f"Prediction dir of scene {scene_id} is empty"
+        scene = ScannetppScene_Release(scene_id, data_root=data_root)
+        image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
+
+        assert num_images_pred == len(
+            image_list
+        ), f"Prediction dir of scene {scene_id} should have {len(image_list)} images instead of {num_images_pred}"
 
     for scene_id in scene_list:
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
@@ -179,7 +190,10 @@ def evaluate_all(data_root, pred_dir, scene_list):
             Path(pred_dir) / scene_id,
             scene.dslr_resized_dir,
             image_list,
-            scene.dslr_resized_mask_dir,
+            # scene.dslr_resized_mask_dir,
+            scene.dslr_resized_mask_dir
+            if scene_has_mask(scene.dslr_nerfstudio_transform_path)
+            else None,
             auto_resize=True,
             scene_id=scene_id,
             verbose=True,
