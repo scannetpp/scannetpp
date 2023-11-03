@@ -14,7 +14,6 @@ import warnings
 
 def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_label, 
             top_k_pred=[1, 3], eval_against_gt=False):
-
     # check if all files exist
     for scene_id in tqdm(scene_list):
         assert (Path(pred_dir) / f'{scene_id}.txt').is_file(), f'Pred file {scene_id}.txt not found'
@@ -43,6 +42,9 @@ def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_l
             assert pred.min() >= 0, f'Prediction for {scene_id} contains negative labels: {pred.min()}'
         # assert max of preds is  <= (num_classes-1)
         assert pred.max() <= (num_classes-1), f'Prediction for {scene_id} contains labels > {num_classes-1}: {pred.max()}'
+
+        if eval_against_gt:
+            pred = pred[:, 0]
 
         # convert to torch tensors
         pred = torch.LongTensor(pred)
