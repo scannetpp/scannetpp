@@ -189,7 +189,7 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
 
     psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
     ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
-    lpip_metric = LearnedPerceptualImagePatchSimilarity(
+    lpips_metric = LearnedPerceptualImagePatchSimilarity(
         net_type="vgg", normalize=True
     ).to(device)
 
@@ -212,7 +212,7 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
             verbose=True,
             psnr_metric=psnr_metric,
             ssim_metric=ssim_metric,
-            lpip_metric=lpip_metric,
+            lpips_metric=lpips_metric,
             device=device,
         )
         all_psnr.append(scene_psnr)
