@@ -1,36 +1,39 @@
 import numpy as np
 
 
-def fast_hist(pred, label, num_classes):
-    # pick preds only where labels which are valid
-    valid_gt = (label >= 0) & (label < num_classes)
-    flat = np.bincount(num_classes * label[valid_gt].astype(int) + pred[valid_gt], minlength=num_classes**2)
+def fast_hist_multilabel(pred, multilabel, num_classes, ignore_label):
+    '''
+    pred: n,
+    label: n, k
+    '''
+    # pick preds only where labels are valid
+    # must have atleast one label
+    has_gt = (multilabel != ignore_label).sum(1) > 0
+    # label must be between 0 and num_classes-1
+    valid_classes = ((multilabel > 0) & (multilabel < num_classes)).sum(1) > 0
+    valid_gt = has_gt & valid_classes
+
+    pred_valid = pred[valid_gt]
+    multilabel_valid = multilabel[valid_gt]
+
+    # places where pred matches GT
+    matches = pred_valid.reshape(-1, 1) == multilabel_valid 
+    # pred matches any of the GT
+    hits = np.any(matches, axis=1)
+    # index of hit GT
+    hit_ndx = np.argmax(matches, axis=1)
+
+    gt = np.zeros_like(pred_valid)
+    # use the matches GT for these
+    gt[hits] = multilabel_valid[hits][np.arange(len(multilabel_valid)), hit_ndx]
+    # use the top gt everywhere else
+    gt[~hits] = multilabel_valid[~hits][:, 0]
+
+    flat = np.bincount(num_classes * gt.astype(int) + pred_valid, minlength=num_classes**2)
     mat = flat.reshape(num_classes, num_classes)
+
     return mat
 
-def fast_hist_top_k(top_preds, label, num_classes):
-    '''
-    top_preds: n, k
-    label: n,
-    '''
-    # pick preds only where labels which are valid
-    valid_gt = (label >= 0) & (label < num_classes)
-
-    top_preds = top_preds[valid_gt]
-    label = label[valid_gt]
-
-    # one of the top k preds is correct
-    hits = np.any(top_preds == label.reshape(-1, 1), axis=1)
-    pred = np.zeros_like(label)
-    # set the prediction as the GT for these
-    pred[hits] = label[hits]
-    # use the top prediction everywhere else
-    pred[~hits] = top_preds[~hits][:, 0]
-
-    flat = np.bincount(num_classes * label.astype(int) + pred, minlength=num_classes**2)
-    mat = flat.reshape(num_classes, num_classes)
-
-    return mat
 
 def per_class_iu(hist):
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -87,14 +90,15 @@ class ConfMat:
         if len(targets.shape) == 1:
             targets = targets.view(-1, 1)
 
-        # for each possible GT, compare with top-k preds
-        for target_ndx in range(targets.shape[1]):
-            # pick the nth GT
-            target = targets[:, target_ndx]
-            # update the unique GTs, exclude the ignore label
-            curr_unique_gt = set(target.cpu().numpy()) - set([self.ignore_label])
-            self._unique_gt |= curr_unique_gt
-            # update the confusion matrix
-            self._mat += fast_hist_top_k(top_preds.cpu().numpy(), 
-                                        target.cpu().numpy().flatten(), 
-                                        self.num_classes)
+        # update the unique gt
+        curr_unique_gt = set(targets.cpu().numpy().flatten()) - set([self.ignore_label])
+        self._unique_gt |= curr_unique_gt
+
+        # compare each prediction with all the GT
+        for pred_ndx in range(top_preds.shape[1]):
+            # pick the nth pred
+            pred = top_preds[:, pred_ndx]
+            # update the confusion matrix using multilabel
+            self._mat += fast_hist_multilabel(pred.cpu().numpy(), 
+                                              targets.cpu().numpy(), 
+                                              self.num_classes, self.ignore_label)
