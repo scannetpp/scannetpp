@@ -9,7 +9,7 @@ import numpy as np
 from PIL import Image
 import torch
 from torchmetrics.image import PeakSignalNoiseRatio
-from torchmetrics.functional import structural_similarity_index_measure
+from torchmetrics.functional.image.ssim import structural_similarity_index_measure
 from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 from common.scene_release import ScannetppScene_Release
@@ -17,6 +17,7 @@ from common.scene_release import ScannetppScene_Release
 SUPPORT_IMAGE_FORMAT = [".JPG", ".jpg", ".png", ".PNG", ".jpeg"]
 
 
+@torch.no_grad()
 def evaluate_scene(
     pred_dir: Union[str, Path],
     gt_dir: Union[str, Path],
@@ -211,7 +212,7 @@ def main(args):
     else:
         with open(args.split, "r") as f:
             val_scenes = f.readlines()
-            val_scenes = [x.strip() for x in val_scenes]
+            val_scenes = [x.strip() for x in val_scenes if len(x.strip()) > 0]
 
     all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
         args.data_root, args.pred_dir, val_scenes
