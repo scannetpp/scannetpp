@@ -182,7 +182,8 @@ def evaluate_all(data_root, pred_dir, scene_list):
             image_list
         ), f"Prediction dir of scene {scene_id} should have {len(image_list)} images instead of {num_images_pred}"
 
-    for scene_id in scene_list:
+    for i, scene_id in enumerate(scene_list):
+        print(f"({i+1} / {len(scene_list)} scene_id: {scene_id}")
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
         # print(image_list)
