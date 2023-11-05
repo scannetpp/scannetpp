@@ -1,0 +1,19 @@
+# folder where the data is downloaded
+data_root: DATA_ROOT
+
+splits: [nvs_sem_train, nvs_sem_val]
+
+# scene_ids: [355e5e32db]
+
+# The following paths should be given relative to the DATA_ROOT/dslr/
+# If not given, will use the default directory defined in ScannetppScene class
+
+# input_image_dir: resized_images
+# input_mask_dir: resized_anon_masks
+# input_transforms_path: nerfstudio/transforms.json
+
+downscale_factor: 2.0
+# All use the relative path to DATA_ROOT/dslr/
+out_image_dir: resized_images_2
+out_mask_dir: resized_anon_masks_2
+out_transforms_path: nerfstudio/transforms_2.json
