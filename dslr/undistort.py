@@ -28,7 +28,6 @@ def compute_undistort_intrinsic(K, height, width, distortion_params):
 
 
 def undistort_frames(
-    scene,
     frames,
     K,
     height,
@@ -135,9 +134,9 @@ def main(args):
         frames = transforms["frames"]
         if "test_frames" not in transforms:
             print(f"{scene_id} has no test split")
-        elif input_image_dir / transforms["test_frames"][0]["file_path"]:
+        elif not (input_image_dir / transforms["test_frames"][0]["file_path"]).exists():
             print(
-                f"{scene_id} test image not found. Might due to the scene belonging to testing scenes."
+                f"{scene_id} test image not found. Might due to the scene belonging to testing scenes. "
                 "The resizing will skip those images."
             )
         else:
@@ -167,7 +166,6 @@ def main(args):
         )
 
         new_K = undistort_frames(
-            scene,
             frames,
             K,
             height,
@@ -181,7 +179,7 @@ def main(args):
         new_trasforms = update_transforms_json(transforms, new_K, height, width)
         out_transforms_path.parent.mkdir(parents=True, exist_ok=True)
         with open(out_transforms_path, "w") as f:
-            json.dump(new_trasforms, f)
+            json.dump(new_trasforms, f, indent=4)
 
 
 if __name__ == "__main__":
