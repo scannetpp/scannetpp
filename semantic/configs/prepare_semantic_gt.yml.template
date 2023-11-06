@@ -1,0 +1,22 @@
+pth_dir: <dir containing pth files>
+scene_list: <list of scene IDs>
+
+# save in npy format?
+save_npy: false
+# save in txt format?
+save_txt: true
+
+## SEMANTIC
+save_semantic: false
+sem_out_dir: <out dir for semantic GT>
+
+## INSTANCE
+save_instance: false
+# save in gt format: sem*1000 + inst id
+# save in preds format: 1 file for list of instances, 1 file for each instance 
+# same as scannet
+inst_gt_format: false
+inst_gtformat_out_dir: <out dir for instance GT in GT format = 1 file per scene>
+
+inst_preds_format: false
+inst_predsformat_out_dir: <out dir for instance GT in preds format = 1 file per scene + 1 file per instance>
