@@ -70,8 +70,18 @@ python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_
 
 ## Visualize training data
 
+Configure the PTH data dir, scene list and required outputs in `semantic/configs/viz_pth_data.yml`
 ```
 python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
+```
+
+## Prepare Semantic/Instance Ground Truth files for
+
+Configure the PTH data dir, scene list and required outputs in `semantic/configs/prepare_semantic_gt.yml`
+
+Then run 
+```
+python -m semantic.prep.prepare_semantic_gt semantic/configs/prepare_semantic_gt.yml
 ```
 
 ## 3D Semantic Segmentation Evaluation
