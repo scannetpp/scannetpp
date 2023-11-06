@@ -13,19 +13,26 @@ def fast_hist_multilabel(pred, multilabel, num_classes, ignore_label):
     valid_classes = ((multilabel > 0) & (multilabel < num_classes)).sum(1) > 0
     valid_gt = has_gt & valid_classes
 
+    # (valid,)
     pred_valid = pred[valid_gt]
+    # (valid, k)
     multilabel_valid = multilabel[valid_gt]
 
     # places where pred matches GT
+    # (valid, k)
     matches = pred_valid.reshape(-1, 1) == multilabel_valid 
     # pred matches any of the GT
+    # (valid,)
     hits = np.any(matches, axis=1)
     # index of hit GT
+    # (valid,)
     hit_ndx = np.argmax(matches, axis=1)
 
+    # (valid,)
     gt = np.zeros_like(pred_valid)
     # use the matches GT for these
-    gt[hits] = multilabel_valid[hits][np.arange(len(multilabel_valid)), hit_ndx]
+    hit_multilabel = multilabel_valid[hits] 
+    gt[hits] = hit_multilabel[np.arange(len(hit_multilabel)), hit_ndx[hits]]
     # use the top gt everywhere else
     gt[~hits] = multilabel_valid[~hits][:, 0]
 
