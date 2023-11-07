@@ -26,6 +26,7 @@ def evaluate_scene(
     auto_resize: bool = True,
     scene_id: str = "unknown",
     verbose: bool = False,
+    gt_file_format: str = ".JPG",
     psnr_metric: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=1.0),
     ssim_metric: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
         data_range=1.0
@@ -52,10 +53,11 @@ def evaluate_scene(
 
     for image_fn in image_list:
         image_name = image_fn.split(".")[0]
+        gt_image_path = os.path.join(gt_dir, image_name + gt_file_format)
         assert os.path.exists(
-            os.path.join(gt_dir, image_fn)
+            gt_image_path
         ), f"{scene_id} GT image not found: {image_fn}"
-        gt_image = Image.open(os.path.join(gt_dir, image_fn))
+        gt_image = Image.open(gt_image_path)
 
         pred_image_path = None
         for format in SUPPORT_IMAGE_FORMAT:

@@ -131,7 +131,7 @@ def main(args):
 
         transforms = load_json(input_transforms_path)
         assert len(transforms["frames"]) > 0
-        frames = transforms["frames"]
+        frames = deepcopy(transforms["frames"])
         if "test_frames" not in transforms:
             print(f"{scene_id} has no test split")
         elif not (input_image_dir / transforms["test_frames"][0]["file_path"]).exists():
