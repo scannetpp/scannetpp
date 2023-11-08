@@ -24,7 +24,7 @@ def fast_hist_topk_multilabel(top_preds, multilabel, num_classes, ignore_label):
     top_preds_valid = top_preds[valid_gt]
     # (valid, k)
     multilabel_valid = multilabel[valid_gt]
-    
+
     # init with -1
     pred_final = np.ones(len(top_preds_valid), dtype=np.int32) * -1
     gt_final = np.empty(len(top_preds_valid), dtype=np.int32)
@@ -47,8 +47,10 @@ def fast_hist_topk_multilabel(top_preds, multilabel, num_classes, ignore_label):
         hit_pred = pred[hits]
         hit_gt = gt[hits, hit_ndx[hits]] 
         
-        pred_final[needs_match][hits] = hit_pred
-        gt_final[needs_match][hits] = hit_gt
+        # index into the original array because we cant index twice
+        idx = np.arange(len(pred_final))
+        pred_final[idx[needs_match][hits]] = hit_pred
+        gt_final[idx[needs_match][hits]] = hit_gt
 
     needs_match = pred_final == -1 
     pred_final[needs_match] = top_preds_valid[needs_match, 0]
