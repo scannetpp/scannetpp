@@ -1,10 +1,17 @@
 import numpy as np
 
 
-def fast_hist_multilabel(pred, multilabel, num_classes, ignore_label):
+def fast_hist_topk_multilabel(top_preds, multilabel, num_classes, ignore_label):
     '''
-    pred: n,
-    label: n, k
+    Compare topk pred with multilabel
+    pred: n, k1
+    label: n, k2 (with ignore labels)
+    Pick the vertices which have atleast 1 valid label
+    Go through each pred
+        Check if the pred matches any GT 
+        If its a hit, set hit_pred and hit_gt with the corresponding pred and GT
+    Any vertex without a hit, pick the first pred and the first GT
+    Compute confusion matrix
     '''
     # pick preds only where labels are valid
     # must have atleast one label
@@ -14,33 +21,52 @@ def fast_hist_multilabel(pred, multilabel, num_classes, ignore_label):
     valid_gt = has_gt & valid_classes
 
     # (valid,)
-    pred_valid = pred[valid_gt]
+    top_preds_valid = top_preds[valid_gt]
     # (valid, k)
     multilabel_valid = multilabel[valid_gt]
+    
+    # init with -1
+    pred_final = np.ones(len(top_preds_valid), dtype=np.int32) * -1
+    gt_final = np.empty(len(top_preds_valid), dtype=np.int32)
 
-    # places where pred matches GT
-    # (valid, k)
-    matches = pred_valid.reshape(-1, 1) == multilabel_valid 
-    # pred matches any of the GT
-    # (valid,)
-    hits = np.any(matches, axis=1)
-    # index of hit GT
-    # (valid,)
-    hit_ndx = np.argmax(matches, axis=1)
+    for pred_ndx in range(top_preds_valid.shape[1]):
+        # find the vertices without pred/gt matching yet
+        needs_match = (pred_final == -1)
+        # pick the pred and gt 
+        pred = top_preds_valid[:, pred_ndx][needs_match]
+        gt = multilabel_valid[needs_match]
+        # # places where pred matches GT
+        # # (valid, k)
+        matches = pred.reshape(-1, 1) == gt
+        # # pred matches any of the GT
+        # # (valid,)
+        hits = np.any(matches, axis=1)
+        # # index of hit GT
+        # # (valid,)
+        hit_ndx = np.argmax(matches, axis=1)
 
-    # (valid,)
-    gt = np.zeros_like(pred_valid)
-    # use the matches GT for these
-    hit_multilabel = multilabel_valid[hits] 
-    gt[hits] = hit_multilabel[np.arange(len(hit_multilabel)), hit_ndx[hits]]
-    # use the top gt everywhere else
-    gt[~hits] = multilabel_valid[~hits][:, 0]
+        # insert into pred_final and gt_final
+        # # (valid,)
+        # # use the matched GT for these
+        hit_pred = pred[hits]
+        hit_gt = gt[hits, hit_ndx[hits]] 
+        
+        pred_final[needs_match][hits] = hit_pred
+        gt_final[needs_match][hits] = hit_gt
 
-    flat = np.bincount(num_classes * gt.astype(int) + pred_valid, minlength=num_classes**2)
+    needs_match = pred_final == -1 
+    pred_final[needs_match] = top_preds_valid[needs_match, 0]
+    gt_final[needs_match] = multilabel_valid[needs_match, 0]
+
+    # anything not matched - pick the 1st pred and 1st gt
+    # should have all preds not -1
+    assert pred_final.min() >= 0
+    assert gt_final.min() >= 0
+
+    flat = np.bincount(num_classes * gt_final.astype(int) + pred_final, minlength=num_classes**2)
     mat = flat.reshape(num_classes, num_classes)
 
     return mat
-
 
 def per_class_iu(hist):
     with np.errstate(divide='ignore', invalid='ignore'):
@@ -101,11 +127,9 @@ class ConfMat:
         curr_unique_gt = set(targets.cpu().numpy().flatten()) - set([self.ignore_label])
         self._unique_gt |= curr_unique_gt
 
-        # compare each prediction with all the GT
-        for pred_ndx in range(top_preds.shape[1]):
-            # pick the nth pred
-            pred = top_preds[:, pred_ndx]
-            # update the confusion matrix using multilabel
-            self._mat += fast_hist_multilabel(pred.cpu().numpy(), 
-                                              targets.cpu().numpy(), 
-                                              self.num_classes, self.ignore_label)
+        breakpoint()
+
+        # compare topk preds to multilabel gt
+        self._mat += fast_hist_topk_multilabel(top_preds.cpu().numpy(),
+                                               targets.cpu().numpy(),
+                                               self.num_classes, self.ignore_label)

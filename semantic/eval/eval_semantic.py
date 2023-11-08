@@ -54,6 +54,7 @@ def eval_semantic(scene_list, pred_dir, gt_dir, data_root, num_classes, ignore_l
 
         # single prediction? repeat to make it N, max_k
         if len(pred.shape) == 1:
+            print(f'Found single prediction for {scene_id}, repeating {max_k} times')
             pred = pred.reshape(-1, 1).repeat(1, max_k)
 
         gt = torch.LongTensor(gt)
