@@ -17,7 +17,7 @@ def fast_hist_topk_multilabel(top_preds, multilabel, num_classes, ignore_label):
     # must have atleast one label
     has_gt = (multilabel != ignore_label).sum(1) > 0
     # label must be between 0 and num_classes-1
-    valid_classes = ((multilabel > 0) & (multilabel < num_classes)).sum(1) > 0
+    valid_classes = ((multilabel >= 0) & (multilabel < num_classes)).sum(1) > 0
     valid_gt = has_gt & valid_classes
 
     # (valid,)
@@ -36,17 +36,13 @@ def fast_hist_topk_multilabel(top_preds, multilabel, num_classes, ignore_label):
         pred = top_preds_valid[:, pred_ndx][needs_match]
         gt = multilabel_valid[needs_match]
         # # places where pred matches GT
-        # # (valid, k)
         matches = pred.reshape(-1, 1) == gt
         # # pred matches any of the GT
-        # # (valid,)
         hits = np.any(matches, axis=1)
         # # index of hit GT
-        # # (valid,)
         hit_ndx = np.argmax(matches, axis=1)
 
         # insert into pred_final and gt_final
-        # # (valid,)
         # # use the matched GT for these
         hit_pred = pred[hits]
         hit_gt = gt[hits, hit_ndx[hits]] 
@@ -126,8 +122,6 @@ class ConfMat:
         # update the unique gt
         curr_unique_gt = set(targets.cpu().numpy().flatten()) - set([self.ignore_label])
         self._unique_gt |= curr_unique_gt
-
-        breakpoint()
 
         # compare topk preds to multilabel gt
         self._mat += fast_hist_topk_multilabel(top_preds.cpu().numpy(),
