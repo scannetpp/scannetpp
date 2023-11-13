@@ -5,6 +5,10 @@ from munch import Munch
 import json
 import yaml
 
+def write_json(path, data):
+    with open(path, "w") as f:
+        f.write(json.dumps(data, indent=4))
+
 def load_json(path):
     with open(path) as f:
         j = json.load(f)
