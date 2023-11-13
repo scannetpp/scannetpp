@@ -24,6 +24,9 @@ def compute_undistort_intrinsic(K, height, width, distortion_params):
         np.eye(3),
         balance=0.0,
     )
+    # Make the cx and cy to be the center of the image
+    new_K[0, 2] = width / 2.0
+    new_K[1, 2] = height / 2.0
     return new_K
 
 
@@ -51,7 +54,7 @@ def undistort_frames(
             map1,
             map2,
             interpolation=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
+            borderMode=cv2.BORDER_REFLECT_101,
         )
         out_image_path = Path(out_image_dir) / frame["file_path"]
         out_image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -60,15 +63,21 @@ def undistort_frames(
         # Mask
         mask_path = Path(input_mask_dir) / frame["mask_path"]
         mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
-        undistorted_mask = cv2.remap(
-            mask,
-            map1,
-            map2,
-            interpolation=cv2.INTER_LINEAR,
-            borderMode=cv2.BORDER_CONSTANT,
-        )
-        # Filter the mask valid: 255, invalid: 0
-        undistorted_mask[undistorted_mask < 255] = 0
+        if np.all(mask > 0):
+            # No invalid pixels. Just use empty mask
+            undistorted_mask = np.zeros((height, width), dtype=np.uint8) + 255
+        else:
+            undistorted_mask = cv2.remap(
+                mask,
+                map1,
+                map2,
+                interpolation=cv2.INTER_LINEAR,
+                borderMode=cv2.BORDER_CONSTANT,
+                borderValue=255,
+            )
+            # Filter the mask valid: 255, invalid: 0
+            undistorted_mask[undistorted_mask < 255] = 0
+
         out_mask_path = Path(out_mask_dir) / frame["mask_path"]
         out_mask_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(out_mask_path), undistorted_mask)
@@ -131,7 +140,7 @@ def main(args):
 
         transforms = load_json(input_transforms_path)
         assert len(transforms["frames"]) > 0
-        frames = transforms["frames"]
+        frames = deepcopy(transforms["frames"])
         if "test_frames" not in transforms:
             print(f"{scene_id} has no test split")
         elif not (input_image_dir / transforms["test_frames"][0]["file_path"]).exists():
