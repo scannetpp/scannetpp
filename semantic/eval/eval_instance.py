@@ -30,10 +30,12 @@ import numpy as np
 from pathlib import Path
 from tqdm import tqdm
 import numpy as np
+import time
 
 import semantic.utils.instance_utils as instance_utils
-from common.file_io import load_yaml_munch, read_txt_list
+from common.file_io import load_json, load_yaml_munch, read_txt_list
 from common.scene_release import ScannetppScene_Release
+from common.utils.rle import rle_decode
 
 import warnings
 
@@ -324,15 +326,13 @@ def assign_instances_for_scan(pred_file, gt_file, preds_dir, ignore_mask, label_
             continue
 
         label_name = label_info.id_to_label[label_id]
-        pred_mask = instance_utils.load_ids(pred_mask_file)
+        # load mask from RLE JSON
+        pred_mask = rle_decode(load_json(pred_mask_file))
         # keep only unmasked preds
         pred_mask = pred_mask[keep_vtx]
-        
         assert len(pred_mask) == len(gt_ids), f'Wrong number of lines in {pred_mask_file}: {len(pred_mask)} vs #mesh vertices {len(gt_ids)}, please check and/or re-download the mesh'
 
         # convert to binary
-        pred_mask = np.not_equal(pred_mask, 0)
-
         num = np.count_nonzero(pred_mask)
 
         # dont have enough vertices with indices
@@ -519,11 +519,14 @@ def main(args):
     # evaluation parameters, can be customized
     eval_opts = instance_utils.Instance_Eval_Opts()
 
-    # TODO: catch assertion errors and re-raise as custom errors
+    start = time.time()
+
     results = eval_instance(scene_ids, cfg.preds_dir, cfg.gt_dir, cfg.data_root,
                             label_info, eval_opts, cfg.check_pred_files)
     # print everything
     print_results(results, label_info)
+
+    print(f'Evaluation done in: {time.time() - start:.2f}s')
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()

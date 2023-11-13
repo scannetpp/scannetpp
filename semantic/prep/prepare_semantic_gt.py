@@ -3,10 +3,12 @@ Read training pth files and save only the ground truth labels as npy/txt files
 '''
 
 from pathlib import Path
+from common.file_io import write_json
+from common.utils.rle import rle_encode
 import torch
 from tqdm import tqdm
 import numpy as np
-from utils.file_io import load_yaml_munch, read_txt_list
+from common.file_io import load_yaml_munch, read_txt_list
 import argparse
 
 '''
@@ -149,11 +151,11 @@ def main(args):
                     inst_sem_label = sem_gt[inst_mask][0]
                     # add a line to the main file with relative path
                     # predicted_masks <semantic label> <confidence=1>
-                    mask_path_relative = f'predicted_masks/{scene_id}_{inst_ndx:03d}.txt'
+                    mask_path_relative = f'predicted_masks/{scene_id}_{inst_ndx:03d}.json'
                     main_txt_lines.append(f'{mask_path_relative} {inst_sem_label} 1.0')
                     # save the instance mask to a file in the predicted_masks dir
                     mask_path = inst_predsformat_out_dir / mask_path_relative
-                    np.savetxt(mask_path, inst_mask, fmt='%d', delimiter=',')
+                    write_json(mask_path, rle_encode(inst_mask))
 
                 # save the main txt file
                 with open(main_txt_file, 'w') as f:
