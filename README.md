@@ -16,7 +16,7 @@ Table of Contents
    * [Semantics](#semantics)
       * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
       * [Visualize training data](#visualize-training-data)
-      * [Prepare Semantic/Instance Ground Truth files for](#prepare-semanticinstance-ground-truth-files-for-evaluation)
+      * [Prepare Semantic/Instance Ground Truth Files for Evaluation](#prepare-semanticinstance-ground-truth-files-for-evaluation)
       * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
       * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
    * [Novel View Synthesis](#novel-view-synthesis)
