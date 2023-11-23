@@ -1,5 +1,29 @@
 # ScanNet++ Toolkit
 
+Table of Contents
+=================
+
+* [ScanNet++ Toolkit](#scannet-toolkit)
+   * [Requirements](#requirements)
+   * [DSLR](#dslr)
+      * [Undistortion: convert fisheye images to pinhole with OpenCV](#undistortion-convert-fisheye-images-to-pinhole-with-opencv)
+      * [Downscale the DSLR images](#downscale-the-dslr-images)
+      * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
+      * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
+      * [Render Semantics (coming soon)](#render-semantics-coming-soon)
+   * [iPhone](#iphone)
+      * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
+   * [Semantics](#semantics)
+      * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
+      * [Visualize training data](#visualize-training-data)
+      * [Prepare Semantic/Instance Ground Truth files for](#prepare-semanticinstance-ground-truth-files-for)
+      * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
+      * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
+   * [Novel View Synthesis](#novel-view-synthesis)
+      * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+
+<!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+
 ## Requirements
 ```
 conda create -n scannetpp python=3.10
