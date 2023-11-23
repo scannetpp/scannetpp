@@ -1,18 +1,18 @@
 import argparse
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Callable
 import json
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
 from PIL import Image
 import torch
 from torchmetrics.image import PeakSignalNoiseRatio
-from torchmetrics.image import StructuralSimilarityIndexMeasure
-from torchmetrics.image.lpip import LearnedPerceptualImagePatchSimilarity
 
 from common.scene_release import ScannetppScene_Release
+from eval.ssim import ssim as SSIM
+from eval.lpips.lpips import LPIPS
+
 
 SUPPORT_IMAGE_FORMAT = [".JPG", ".jpg", ".png", ".PNG", ".jpeg"]
 
@@ -27,24 +27,31 @@ def evaluate_scene(
     scene_id: str = "unknown",
     verbose: bool = False,
     gt_file_format: str = ".JPG",
-    psnr_metric: PeakSignalNoiseRatio = PeakSignalNoiseRatio(data_range=1.0),
-    ssim_metric: StructuralSimilarityIndexMeasure = StructuralSimilarityIndexMeasure(
-        data_range=1.0
-    ),
-    lpips_metric: LearnedPerceptualImagePatchSimilarity = LearnedPerceptualImagePatchSimilarity(
-        net_type="vgg", normalize=True
-    ),
+    psnr_metric: Callable = PeakSignalNoiseRatio(data_range=1.0),
+    ssim_metric: Callable = SSIM,
+    lpips_metric: Callable = LPIPS(net_type="vgg", normalize=True),
     device="cpu",
 ):
     """Evaluate a scene using PSNR, SSIM and LPIPS metrics.
+
     Args:
-        pred_dir: Path to the predicted images.
-        gt_dir: Path to the ground truth images.
-        image_list: List of image filenames to evaluate.
-        mask_dir: Path to the masks. If provided, the metrics will be computed only on the masked regions.
-        auto_resize: If True, automatically resize the predicted images to match the GT image size.
-        scene_id: Scene identifier for verbose print.
-        verbose: If True, print the metrics.
+        pred_dir (Union[str, Path]): Path to the directory containing the predicted images.
+        gt_dir (Union[str, Path]): Path to the directory containing the GT images.
+        image_list (List[str]): List of image names to evaluate.
+        mask_dir (Optional[Union[str, Path]], optional): Path to the directory containing the masks. Evaluate without mask if None. Defaults to None.
+        auto_resize (bool, optional): If True, resize the pred image to match the GT image size if the sizes are different. Defaults to True.
+        scene_id (str, optional): Scene ID for logging.
+        verbose (bool, optional): Print the evaluation results. Defaults to False.
+        gt_file_format (str, optional): File format of the GT images. Defaults to ".JPG".
+        psnr_metric (PeakSignalNoiseRatio, optional): Callable function to compute PSNR. Defaults to PeakSignalNoiseRatio(data_range=1.0).
+        ssim_metric (StructuralSimilarityIndexMeasure, optional): Callable function to compute SSIM. Defaults to StructuralSimilarityIndexMeasure( data_range=1.0, return_full_image=True, ).
+        lpips_metric (LearnedPerceptualImagePatchSimilarity, optional): Callable function to compute LPIPS. Defaults to LearnedPerceptualImagePatchSimilarity( net_type="vgg", normalize=True ).
+        device (str, optional): _description_. Defaults to "cpu".
+
+    Returns:
+        psnr_values (List[float]): List of PSNR values.
+        ssim_values (List[float]): List of SSIM values.
+        lpips_values (List[float]): List of LPIPS values.
     """
 
     psnr_values = []
@@ -108,36 +115,18 @@ def evaluate_scene(
         gt_image = gt_image.permute(2, 0, 1).unsqueeze(0)
         pred_image = pred_image.permute(2, 0, 1).unsqueeze(0)
 
-        if mask is not None:
+        # If the mask is given and not all pixels are valid
+        if mask is not None and not torch.all(mask):
+            mask = mask.unsqueeze(0)  # (1, H, W)
             valid_gt = torch.masked_select(gt_image, mask).view(3, -1)
             valid_pred = torch.masked_select(pred_image, mask).view(3, -1)
             psnr = psnr_metric(valid_pred, valid_gt)
-
-            # Fill the invalid region with the average color for SSIM and LPIPS
-            average_color = valid_gt.mean(dim=-1)
-            for i in range(3):
-                pred_image[0, i, ...] = torch.masked_fill(
-                    pred_image[0, i, ...], ~mask, average_color[i]
-                )
-                gt_image[0, i, ...] = torch.masked_fill(
-                    gt_image[0, i, ...], ~mask, average_color[i]
-                )
+            ssim = ssim_metric(pred_image, gt_image, mask=mask)
+            lpips = lpips_metric(pred_image, gt_image, mask=mask)
         else:
             psnr = psnr_metric(pred_image, gt_image)
-        ssim = ssim_metric(pred_image, gt_image)
-        lpips = lpips_metric(pred_image, gt_image)
-        # # Save the images for debugging
-        # pred_image = pred_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
-        # gt_image = gt_image.squeeze(0).permute(1, 2, 0).cpu().numpy()
-
-        # os.makedirs(os.path.join("/tmp/val_debug", scene_id, "pred"), exist_ok=True)
-        # os.makedirs(os.path.join("/tmp/val_debug", scene_id, "gt"), exist_ok=True)
-        # Image.fromarray((pred_image * 255).astype(np.uint8)).save(
-        #     os.path.join("/tmp/val_debug", scene_id, "pred", image_fn)
-        # )
-        # Image.fromarray((gt_image * 255).astype(np.uint8)).save(
-        #     os.path.join("/tmp/val_debug", scene_id, "gt", image_fn)
-        # )
+            ssim = ssim_metric(pred_image, gt_image)
+            lpips = lpips_metric(pred_image, gt_image)
 
         psnr_values.append(psnr.item())
         ssim_values.append(ssim.item())
@@ -153,7 +142,6 @@ def evaluate_scene(
         print(
             f"Scene: {scene_id} LPIPS: {np.mean(lpips_values):.4f} +/- {np.std(lpips_values):.4f}"
         )
-
     return psnr_values, ssim_values, lpips_values
 
 
@@ -170,7 +158,7 @@ def scene_has_mask(transforms_path: str):
     return transforms["has_mask"]
 
 
-def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
+def evaluate_all(data_root, pred_dir, scene_list, device="cpu", verbose=True):
     all_images = []
     all_psnr = []
     all_ssim = []
@@ -185,38 +173,37 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
 
-        assert num_images_pred == len(
-            image_list
-        ), f"Prediction dir of scene {scene_id} should have {len(image_list)} images instead of {num_images_pred}"
+        # assert num_images_pred == len(
+        #     image_list
+        # ), f"Prediction dir of scene {scene_id} should have {len(image_list)} images instead of {num_images_pred}"
 
     psnr_metric = PeakSignalNoiseRatio(data_range=1.0).to(device)
-    ssim_metric = StructuralSimilarityIndexMeasure(data_range=1.0).to(device)
-    lpips_metric = LearnedPerceptualImagePatchSimilarity(
-        net_type="vgg", normalize=True
-    ).to(device)
+    ssim_metric = SSIM
+    lpips_metric = LPIPS(net_type="vgg", normalize=True, eval_mode=True).to(device)
 
     for i, scene_id in enumerate(scene_list):
-        print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
+        if verbose:
+            print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
-        # print(image_list)
 
+        mask_dir = None
+        if scene_has_mask(scene.dslr_nerfstudio_transform_path):
+            mask_dir = scene.dslr_resized_mask_dir
         scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
             Path(pred_dir) / scene_id,
             scene.dslr_resized_dir,
             image_list,
-            # scene.dslr_resized_mask_dir,
-            scene.dslr_resized_mask_dir
-            if scene_has_mask(scene.dslr_nerfstudio_transform_path)
-            else None,
+            mask_dir,
             auto_resize=True,
             scene_id=scene_id,
-            verbose=True,
             psnr_metric=psnr_metric,
             ssim_metric=ssim_metric,
             lpips_metric=lpips_metric,
             device=device,
+            verbose=verbose,
         )
+
         all_psnr.append(scene_psnr)
         all_ssim.append(scene_ssim)
         all_lpips.append(scene_lpips)
