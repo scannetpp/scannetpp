@@ -2,7 +2,6 @@ import argparse
 from typing import List, Optional, Union, Callable
 import json
 import os
-import sys
 from pathlib import Path
 
 import numpy as np
@@ -122,7 +121,7 @@ def evaluate_scene(
             valid_gt = torch.masked_select(gt_image, mask).view(3, -1)
             valid_pred = torch.masked_select(pred_image, mask).view(3, -1)
             psnr = psnr_metric(valid_pred, valid_gt)
-            ssim = ssim_metric(pred_image,  gt_image, mask=mask)
+            ssim = ssim_metric(pred_image, gt_image, mask=mask)
             lpips = lpips_metric(pred_image, gt_image, mask=mask)
         else:
             psnr = psnr_metric(pred_image, gt_image)
@@ -159,7 +158,7 @@ def scene_has_mask(transforms_path: str):
     return transforms["has_mask"]
 
 
-def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
+def evaluate_all(data_root, pred_dir, scene_list, device="cpu", verbose=True):
     all_images = []
     all_psnr = []
     all_ssim = []
@@ -183,24 +182,26 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu"):
     lpips_metric = LPIPS(net_type="vgg", normalize=True, eval_mode=True).to(device)
 
     for i, scene_id in enumerate(scene_list):
-        print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
+        if verbose:
+            print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
         scene = ScannetppScene_Release(scene_id, data_root=data_root)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
 
+        mask_dir = None
+        if scene_has_mask(scene.dslr_nerfstudio_transform_path):
+            mask_dir = scene.dslr_resized_mask_dir
         scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
             Path(pred_dir) / scene_id,
             scene.dslr_resized_dir,
             image_list,
-            scene.dslr_resized_mask_dir
-            if scene_has_mask(scene.dslr_nerfstudio_transform_path)
-            else None,
+            mask_dir,
             auto_resize=True,
             scene_id=scene_id,
-            verbose=True,
             psnr_metric=psnr_metric,
             ssim_metric=ssim_metric,
             lpips_metric=lpips_metric,
             device=device,
+            verbose=verbose,
         )
 
         all_psnr.append(scene_psnr)
