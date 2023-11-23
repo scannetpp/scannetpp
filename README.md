@@ -16,7 +16,7 @@ Table of Contents
    * [Semantics](#semantics)
       * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
       * [Visualize training data](#visualize-training-data)
-      * [Prepare Semantic/Instance Ground Truth files for](#prepare-semanticinstance-ground-truth-files-for)
+      * [Prepare Semantic/Instance Ground Truth files for](#prepare-semanticinstance-ground-truth-files-for-evaluation)
       * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
       * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
    * [Novel View Synthesis](#novel-view-synthesis)
@@ -116,7 +116,7 @@ Configure the PTH data dir, scene list and required outputs in `semantic/configs
 python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
-### Prepare Semantic/Instance Ground Truth files for
+### Prepare Semantic/Instance Ground Truth Files for Evaluation
 
 Configure the PTH data dir, scene list and required outputs in `semantic/configs/prepare_semantic_gt.yml`
 
