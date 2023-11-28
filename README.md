@@ -27,9 +27,11 @@ Table of Contents
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
 ## Dataset Documentation
-Please refer to the official dataset documentation [here](https://kaldir.vc.in.tum.de/scannetpp/) which describes the files provided in the dataset.
+Please refer to the [official dataset documentation](https://kaldir.vc.in.tum.de/scannetpp/documentation) which describes the files provided in the dataset.
 
 The recommended way of accessing individual files and directories is through the provided [scene class](common/scene_release.py).
+
+For evaluation and submission, refer to the [submission instructions](https://kaldir.vc.in.tum.de/scannetpp/benchmark/docs).
 
 ## Requirements
 ```
