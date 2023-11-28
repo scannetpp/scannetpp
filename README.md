@@ -108,7 +108,14 @@ python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ## Semantics
 
 ### Prepare 3D Semantics Training Data
-Scripts to sample points on the mesh and map 1.5k+ raw labels to the benchmark classes.
+The meshes may not have a uniform distribution of mesh 
+vertices and voxelizing these could lead to holes in the data.
+Hence, the vertices must not be treated as a *point cloud*. 
+
+Instead, please sample points on the surface of the mesh and use
+these as inputs for voxelization, etc.
+
+An example of how to do this is given. This script samples points on the mesh and maps 1.5k+ raw labels to the benchmark classes.
 
 Configure the paths in `semantic/configs/prepare_training_data.yml`
 
@@ -126,15 +133,7 @@ python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ### Prepare Semantic/Instance Ground Truth Files for Evaluation
-The meshes may not have a uniform distribution of mesh 
-vertices and voxelizing these could lead to holes in the data.
-Hence, the vertices must not be treated as a *point cloud*. 
-
-Instead, please sample points on the surface of the mesh and use
-these as inputs for voxelization, etc.
-
-An example of how to do this is given. Configure the PTH data dir, 
-scene list and required outputs in
+Configure the PTH data dir, scene list and required outputs in
 `semantic/configs/prepare_semantic_gt.yml`
 
 Then run 
