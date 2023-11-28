@@ -27,9 +27,9 @@ Table of Contents
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
 ## Dataset Documentation
-Please refer to the [official dataset documentation](https://kaldir.vc.in.tum.de/scannetpp/documentation) which describes the files provided in the dataset.
+Please refer to the [official dataset documentation](https://kaldir.vc.in.tum.de/scannetpp/documentation) which describes the files in the dataset.
 
-The recommended way of accessing individual files and directories is through the provided [scene class](common/scene_release.py).
+The recommended way of accessing individual files and directories is through the  [scene class](common/scene_release.py).
 
 For evaluation and submission, refer to the [submission instructions](https://kaldir.vc.in.tum.de/scannetpp/benchmark/docs).
 
@@ -126,14 +126,14 @@ python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ### Prepare Semantic/Instance Ground Truth Files for Evaluation
-The provided meshes may not have a uniform distribution of mesh 
+The meshes may not have a uniform distribution of mesh 
 vertices and voxelizing these could lead to holes in the data.
 Hence, the vertices must not be treated as a *point cloud*. 
 
 Instead, please sample points on the surface of the mesh and use
 these as inputs for voxelization, etc.
 
-An example of how to do this is provided. Configure the PTH data dir, 
+An example of how to do this is given. Configure the PTH data dir, 
 scene list and required outputs in
 `semantic/configs/prepare_semantic_gt.yml`
 
