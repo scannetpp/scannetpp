@@ -125,6 +125,8 @@ Then run
 python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_data.yml
 ```
 
+This generated PTH files with labels on the sampled points. 
+
 ### Visualize training data
 
 Configure the PTH data dir, scene list and required outputs in `semantic/configs/viz_pth_data.yml`
@@ -133,10 +135,8 @@ python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ### Prepare Semantic/Instance Ground Truth Files for Evaluation
-Configure the PTH data dir, scene list and required outputs in
-`semantic/configs/prepare_semantic_gt.yml`
-
-Then run 
+Prepare PTH files similar to the training data step, but without point sampling. Then configure the PTH data dir, scene list and required outputs in `semantic/configs/prepare_semantic_gt.yml`
+and run 
 ```
 python -m semantic.prep.prepare_semantic_gt semantic/configs/prepare_semantic_gt.yml
 ```
