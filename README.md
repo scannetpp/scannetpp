@@ -1,5 +1,7 @@
 # ScanNet++ Toolkit
 
+![teaser](img/teaser.jpg)
+
 Table of Contents
 =================
 
