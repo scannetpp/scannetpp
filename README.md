@@ -24,6 +24,11 @@ Table of Contents
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
 
+## Dataset Documentation
+Please refer to the official dataset documentation [here](https://kaldir.vc.in.tum.de/scannetpp/) which describes the files provided in the dataset.
+
+The recommended way of accessing individual files and directories is through the provided [scene class](common/scene_release.py).
+
 ## Requirements
 ```
 conda create -n scannetpp python=3.10
@@ -117,8 +122,16 @@ python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
 ```
 
 ### Prepare Semantic/Instance Ground Truth Files for Evaluation
+The provided meshes may not have a uniform distribution of mesh 
+vertices and voxelizing these could lead to holes in the data.
+Hence, the vertices must not be treated as a *point cloud*. 
 
-Configure the PTH data dir, scene list and required outputs in `semantic/configs/prepare_semantic_gt.yml`
+Instead, please sample points on the surface of the mesh and use
+these as inputs for voxelization, etc.
+
+An example of how to do this is provided. Configure the PTH data dir, 
+scene list and required outputs in
+`semantic/configs/prepare_semantic_gt.yml`
 
 Then run 
 ```
