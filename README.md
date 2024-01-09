@@ -115,7 +115,7 @@ Hence, the vertices must not be treated as a *point cloud*.
 Instead, please sample points on the surface of the mesh and use
 these as inputs for voxelization, etc.
 
-An example of how to do this is given. This script samples points on the mesh and maps 1.5k+ raw labels to the benchmark classes.
+An example of how to do this is given. This script samples points on the mesh and maps 1.5k+ raw labels to the benchmark classes. The mapping file is at `metadata/semantic_benchmark/map_benchmark.csv`
 
 Configure the paths in `semantic/configs/prepare_training_data.yml`
 
