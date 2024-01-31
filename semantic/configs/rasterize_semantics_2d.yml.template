@@ -1,0 +1,8 @@
+
+
+scene_list: <path to nvs_sem_train.txt>
+data_root: <path to scannetpp_download/data/>
+pth_data_dir: <path to prepared pth files containing annotation>
+semantic_labels_path: <path to corresponding semantic labels> 
+dslr_subsample_factor: 20
+viz: false
