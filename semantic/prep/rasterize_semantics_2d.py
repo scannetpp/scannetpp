@@ -183,12 +183,18 @@ def main(args):
                 obj_bboxes.append(obj_bbox)
                 obj_labels.append(obj_label)
             
-            # get object 2d bboxes
-            obj_bboxes_2d = {}
 
             pix_inst_ids = np.zeros_like(pix_to_face)
+            # get instance ids on pixels
             pix_inst_ids[valid_pix_to_face] = pth_data['vtx_instance_anno_id'][mesh_faces_np[pix_to_face[valid_pix_to_face]][:, 0]]
+            # get semantic labels on pixels, initialize to -1
+            pix_sem_ids = np.ones_like(pix_to_face) * -1
+            # get semantic labels on pixels
+            pix_sem_ids[valid_pix_to_face] = pth_data['vtx_labels'][mesh_faces_np[pix_to_face[valid_pix_to_face]][:, 0]]
 
+            # get object 2d bboxes
+            obj_bboxes_2d = {}
+            
             for obj_id in obj_ids:
                 # get a binary image indicating the location of this obj_id
                 obj_mask_2d = pix_inst_ids == obj_id
