@@ -33,3 +33,7 @@ def load_yaml_munch(path):
         y = yaml.load(f, Loader=yaml.Loader)
 
     return Munch.fromDict(y)
+
+def write_yaml(path, data):
+    with open(path, "w") as f:
+        yaml.dump(data, f)
