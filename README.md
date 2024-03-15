@@ -12,15 +12,16 @@ Table of Contents
       * [Downscale the DSLR images](#downscale-the-dslr-images)
       * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
       * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
-      * [Render Semantics (coming soon)](#render-semantics-coming-soon)
    * [iPhone](#iphone)
       * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
    * [Semantics](#semantics)
       * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
+      * [Split PTH files into chunks for training](#split-pth-files-into-chunks-for-training)
       * [Visualize training data](#visualize-training-data)
       * [Prepare Semantic/Instance Ground Truth Files for Evaluation](#prepare-semanticinstance-ground-truth-files-for-evaluation)
       * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
       * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
+      * [Rasterize 3D Semantics onto 2D Images](#rasterize-3d-semantics-onto-2d-images)
    * [Novel View Synthesis](#novel-view-synthesis)
       * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
 
@@ -97,8 +98,6 @@ output_dir/SCENE_ID/[dslr, iphone]
 ```
 The rendered depth maps are single-channel uint16 png, where the unit is mm and 0 means invalid depth.
 
-### Render Semantics (coming soon)
-
 ## iPhone
 ### Extract RGB frames, masks and depth frames
 ```
@@ -127,6 +126,14 @@ python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_
 ```
 
 This generated PTH files with labels on the sampled points. 
+
+### Split PTH files into chunks for training
+Split the PTH files into smaller chunks of fixed size. For training, use overlapping chunks and for validation, 
+set overlap to 0.
+
+```
+python -m semantic.prep.split_pth_data semantic/configs/split_pth_data_train.yml
+```
 
 ### Visualize training data
 
@@ -165,6 +172,12 @@ Configure the paths to GT, predictions, label list and downloaded data in `seman
 Then run
 ```
 python -m semantic.eval.eval_instance semantic/configs/eval_instance.yml
+```
+
+### Rasterize 3D Semantics onto 2D Images
+To get 3D semantics onto 2D DSLR images, run 
+```
+python -m semantic.prep.rasterize_semantics_2d semantic/configs/rasterize_semantics_2d.yml
 ```
 
 ## Novel View Synthesis
