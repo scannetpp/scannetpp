@@ -7,8 +7,8 @@ extract_masks: true
 extract_depth: true
 
 # folder where the data is downloaded
-data_root: /rhome/cyeshwanth/scannetpp_download/
+data_root: <path to data>
 
 splits: [nvs_sem_train, nvs_sem_val]
 
-# scene_ids: [ebff4de90b]
+scene_ids: [ebff4de90b]
