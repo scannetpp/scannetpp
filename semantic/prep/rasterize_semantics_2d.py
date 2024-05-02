@@ -23,7 +23,7 @@ from pytorch3d.renderer import (
 from scannetpp.common.scene_release import ScannetppScene_Release
 from scannetpp.common.file_io import load_json, load_yaml_munch, read_txt_list
 
-from utils.colmap_utils import read_cameras_text, read_images_text, camera_to_intrinsic
+from semantic.utils.colmap_utils import read_cameras_text, read_images_text, camera_to_intrinsic
 
 if torch.cuda.is_available():
     device = torch.device("cuda:0")
