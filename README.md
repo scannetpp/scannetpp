@@ -125,7 +125,21 @@ Then run
 python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_data.yml
 ```
 
-This generated PTH files with labels on the sampled points. 
+The resulting PTH files are dictionaries with the following keys:
+- `scene_id` - str:  
+    scene name
+- `sampled_coords` - np(n_samples, 3)(float64):  
+    coordinates of points sampled on the mesh
+- `sampled_colors` - np(n_samples, 3)(float64):  
+    rgb colors of points in range [0, 1] (open3d format)
+- `sampled_num_labels` - np(n_samples,)(int16):  
+    num labels used for the point (only relevant for multilabel)
+- `sampled_labels` - np(n_samples,)(int16):  
+    semantic labels of points (consecutive starting at 0: corresponds to index in specified semantic label file)
+- `sampled_instance_labels` - np(n_samples,)(int16):  
+    unique id of instances in scene (non-consecutive because instances might be removed if their semantic class is not contained in the instance label file)
+- `sampled_instance_anno_id` - np(n_samples,)(int16):  
+    instance ids corresponding to segments_anno.json['segGroups']['id']
 
 ### Split PTH files into chunks for training
 Split the PTH files into smaller chunks of fixed size. For training, use overlapping chunks and for validation, 
