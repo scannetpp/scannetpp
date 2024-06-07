@@ -46,10 +46,35 @@ BaseImage = collections.namedtuple(
 Point3D = collections.namedtuple(
     "Point3D", ["id", "xyz", "rgb", "error", "image_ids", "point2D_idxs"])
 
+def camera_to_intrinsic(camera):
+    '''
+    camera object to intrinsic matrix
+    fx 0  cx
+    0  fy cy
+    0  0  1
+    '''
+    return np.array([
+        [camera.params[0], 0, camera.params[2]],
+        [0, camera.params[1], camera.params[3]],
+        [0, 0, 1]
+    ])
+
 
 class Image(BaseImage):
     def qvec2rotmat(self):
         return qvec2rotmat(self.qvec)
+
+    def to_transform_mat(self):
+        '''
+        R, t matrix
+        '''
+        R = self.qvec2rotmat()
+        t = self.tvec 
+        T = np.eye(4)
+        T[:3, :3] = R
+        T[:3, 3] = t
+        return T
+
 
     @property
     def world_to_camera(self) -> np.ndarray:
