@@ -32,6 +32,10 @@ class MapLabelToIndex:
         self.ignore_label = ignore_label
         # map class name to index 0..N in the same order
         self.mapping = {label: ndx for (ndx, label) in enumerate(self.class_names)}
+        
+        # todo: NYU-40 mapping
+        from labels_mapping import raw_to_nyu40
+        self.mapping.update(raw_to_nyu40)
 
     def get_mapping(self):
         return self.mapping
@@ -40,6 +44,7 @@ class MapLabelToIndex:
         return self.class_names
 
     def __call__(self, sample):
+        labels_mapping_lis = {}
         for ndx, anno in enumerate(sample['anno']['segGroups']):
             label = anno['label']
             
@@ -54,8 +59,17 @@ class MapLabelToIndex:
 
             # name -> 0..N, else ignore label
             label_ndx = self.mapping.get(label, self.ignore_label)
-
             sample['anno']['segGroups'][ndx]['label_ndx'] = label_ndx 
+
+            # save lables mapping for each class
+            if label not in labels_mapping_lis:
+                labels_mapping_lis[label] = [label_ndx, self.class_names[label_ndx] if label_ndx>-1 else 'Void']
+
+        scene_id = sample['scene_id']
+        label_mapping_json = f'../scans/semantics_NYU40/{scene_id}_mapping.json'
+        with open(label_mapping_json, 'w') as f:
+            import json
+            json.dump(labels_mapping_lis, f)
 
         return sample
 

@@ -1,0 +1,29 @@
+
+prop_type: sampled_
+# prop_type: sampled_
+
+# training: keep only chunks with atleast these many points
+n_points_threshold: 5000
+# and n unique labels (including ignore labels)
+n_labels_threshold: 5
+# n instances threshold = number of unique instance IDs
+n_instances_threshold: 3
+
+ignore_label: -100
+# this frac of every instance should be within the chunk, if not, discard the instance
+instance_frac_threshold: 0.8
+
+# original scene list
+orig_list_path: ../splits/nvs_sem_train_test.txt
+# original pth files
+orig_pth_dir: ../pth
+
+# output scene list
+out_list_path: ../splits/nvs_sem_train_split.txt
+# output pth dir
+out_pth_dir: ../pth_split
+
+# dimension of each chunk in XY
+chunk_dims_xy: [5, 5]
+# training: overlapping chunks
+chunk_stride_xy: [2.5, 2.5]

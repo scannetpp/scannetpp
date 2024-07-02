@@ -1,0 +1,8 @@
+
+
+scene_list: ../scans/semantics/pth/pth_lis.txt
+data_root: ../scans/data
+pth_data_dir: ../scans/semantics/pth
+semantic_labels_path: ../scans/metadata/nyu40.txt
+dslr_subsample_factor: 20
+viz: true

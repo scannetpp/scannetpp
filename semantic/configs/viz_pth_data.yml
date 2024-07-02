@@ -1,0 +1,24 @@
+
+ignore_label: -100
+# viz on point cloud? use points from PTH data
+viz_pc: true
+viz_mesh: true
+
+# use sampled_ or vtx_ properties?
+use_sampled: false
+
+# viz on mesh? load mesh separately
+data_root: ../scans/data
+
+viz_semantic: true
+viz_instances: false
+
+# scene_list: 
+pth_dir: ../scans/semantics-nyu40/pth
+out_dir: ../scans/semantics-nyu40/pth_viz
+
+output_suffix:
+  semantic: _gt_sem 
+  instance: _gt_inst
+
+palette_path: ../scans/metadata/nyu40_palette.txt

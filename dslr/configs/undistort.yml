@@ -1,19 +1,27 @@
 # folder where the data is downloaded
-data_root: DATA_ROOT
+data_root: ../scans/
 
 splits: [nvs_sem_train, nvs_sem_val]
 
-# scene_ids: [355e5e32db]
+scene_ids: [8b5caf3398]
 
 # The following paths should be given relative to the DATA_ROOT/dslr/
 # If not given, will use the default directory defined in ScannetppScene class
 
 # input_image_dir: resized_images
+# input_depth_dir: resized_depths
+# input_normal_dir: render_normal
+input_semantic_dir: render_semantic-nyu40
 # input_mask_dir: resized_anon_masks
 # input_transforms_path: nerfstudio/transforms.json
 
-downscale_factor: 2.0
 # All use the relative path to DATA_ROOT/dslr/
 out_image_dir: undistorted_images
+out_depth_dir: undistorted_depths
+out_normal_dir: undistorted_normals
+out_semantic_dir: undistorted_semantics-nyu40
 out_mask_dir: undistorted_anon_masks
 out_transforms_path: nerfstudio/transforms_undistorted.json
+
+# semantic_vis
+palette_path: ../scans/metadata/nyu40_palette.txt

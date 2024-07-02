@@ -7,11 +7,11 @@ pick all the points within these chunks and save to separate files
 '''
 
 from pathlib import Path
-from scannetpp.common.utils.utils import read_txt_list
+from common.utils.utils import read_txt_list
 import torch
 from tqdm import tqdm
 import argparse
-from utils.file_io import load_yaml_munch
+from common.file_io import load_yaml_munch
 
 
 def main(args):

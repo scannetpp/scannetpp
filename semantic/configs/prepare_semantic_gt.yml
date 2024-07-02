@@ -1,0 +1,22 @@
+pth_dir: ../scans/semantics-nyu40/pth
+scene_list: ../scans/semantics-nyu40/pth/pth_lis.txt
+
+# save in npy format?
+save_npy: false
+# save in txt format?
+save_txt: true
+
+## SEMANTIC
+save_semantic: true
+sem_out_dir: ../scans/semantics-nyu40/labels/semantic_gt
+
+## INSTANCE
+save_instance: true
+# save in gt format: sem*1000 + inst id
+# save in preds format: 1 file for list of instances, 1 file for each instance 
+# same as scannet
+inst_gt_format: true
+inst_gtformat_out_dir: ../scans/semantics-nyu40/labels/inst_gt
+
+inst_preds_format: true
+inst_predsformat_out_dir: ../scans/semantics-nyu40/labels/inst_pred

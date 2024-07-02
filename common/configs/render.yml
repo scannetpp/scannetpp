@@ -1,19 +1,31 @@
 # folder where the data is downloaded
-data_root: DATA_ROOT
+data_root: ../scans/
 
 # Set True to render depth for iphone frames
-render_iphone: True
+render_iphone: False
 # Set True to render depth for dslr frames
-render_dslr: False
+render_dslr: True
+
+# render RGB and Depth as defualt
+### Set True to render normals
+render_normals: False
+### Set True to render semantics
+render_semantics: True
+semantic_classes: ../scans/metadata/semantic_classes.txt
+render_semantics_dir: render_semantic-nyu40
+mapping_file: ../scans/metadata/semantic_benchmark/map_benchmark.csv
+labels_path: ../scans/metadata/nyu40.txt
+palette_path: ../scans/metadata/nyu40_palette.txt
+ignore_label: -100
 
 splits: [nvs_sem_train, nvs_sem_val]
 
 # Specify scene ids if you want to render depth for specific scenes
-# scene_ids: [355e5e32db]
+scene_ids: [0d2ee665be, 3f15a9266d]
 
 # The near and far planes for the depth camera during rendering in meters.
 near: 0.05
 far: 20.0
 
 # Output directory for the rendered depth images. If not given, the output will be saved to data folder in data_root
-# output_dir: OUTPUT_DIR
+output_dir: ../scans/data/

@@ -37,9 +37,16 @@ def undistort_frames(
     width,
     distortion_params,
     input_image_dir,
+    input_depth_dir,
+    input_normal_dir,
+    input_semantic_dir,
     input_mask_dir,
     out_image_dir,
+    out_depth_dir,
+    out_normal_dir,
+    out_semantic_dir, 
     out_mask_dir,
+    semantic_palette
 ):
     new_K = compute_undistort_intrinsic(K, height, width, distortion_params)
     map1, map2 = cv2.fisheye.initUndistortRectifyMap(
@@ -47,6 +54,7 @@ def undistort_frames(
     )
 
     for frame in tqdm(frames, desc="frame"):
+        # Undistort RGB as default
         image_path = Path(input_image_dir) / frame["file_path"]
         image = cv2.imread(str(image_path))
         undistorted_image = cv2.remap(
@@ -60,7 +68,54 @@ def undistort_frames(
         out_image_path.parent.mkdir(parents=True, exist_ok=True)
         cv2.imwrite(str(out_image_path), undistorted_image)
 
-        # Mask
+        # Undistort depth as default
+        depth_path = Path(input_depth_dir) / frame["file_path"].replace(".JPG", ".png")
+        depth = cv2.imread(str(depth_path), cv2.IMREAD_UNCHANGED)
+        undistorted_depth = cv2.remap(
+            depth,
+            map1,
+            map2,
+            interpolation=cv2.INTER_NEAREST,
+            borderMode=cv2.BORDER_CONSTANT,
+        )
+        out_depth_path = Path(out_depth_dir) / frame["file_path"].replace(".JPG", ".png")
+        out_depth_path.parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(out_depth_path), undistorted_depth)
+        # Depth_vis
+        undistorted_depth_vis = (undistorted_depth.astype(np.float32) / 1000.0)*50
+        undistorted_depth_vis = cv2.applyColorMap(cv2.convertScaleAbs(undistorted_depth_vis), cv2.COLORMAP_JET)
+        out_depth_vis_path = Path(str(out_depth_dir)+'_vis') / frame["file_path"].replace(".JPG", ".png")
+        out_depth_vis_path.parent.mkdir(parents=True, exist_ok=True)
+        cv2.imwrite(str(out_depth_vis_path), undistorted_depth_vis)
+        
+        # Undistort normals as optional
+        if input_normal_dir and (~ os.path.exists(Path(input_normal_dir))):
+            # todo: undistort normals
+            pass
+
+        # Undistort semantics as optional
+        if input_semantic_dir and (~ os.path.exists(Path(input_semantic_dir))):
+            semantic_path = Path(input_semantic_dir) / frame["file_path"].replace(".JPG", ".png")
+            semantic = cv2.imread(str(semantic_path), cv2.IMREAD_UNCHANGED)
+            undistorted_semantic = cv2.remap(
+                semantic,
+                map1,
+                map2,
+                interpolation=cv2.INTER_NEAREST,
+                borderMode=cv2.BORDER_CONSTANT,
+            )
+            out_semantic_path = Path(out_semantic_dir) / frame["file_path"].replace(".JPG", ".png")
+            out_semantic_path.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(out_semantic_path), undistorted_semantic)
+            # Semantic_vis
+            viz_color = np.zeros((semantic.shape[0], semantic.shape[1], 3)).astype(np.uint8)
+            valid_labels = undistorted_semantic != 65535
+            viz_color[valid_labels] = semantic_palette[undistorted_semantic[valid_labels] % len(semantic_palette)]
+            out_semantic_vis_path = Path(str(out_semantic_dir)+'_vis') / frame["file_path"].replace(".JPG", ".png")
+            out_semantic_vis_path.parent.mkdir(parents=True, exist_ok=True)
+            cv2.imwrite(str(out_semantic_vis_path), viz_color[...,::-1])
+
+        # Undistort mask as default
         mask_path = Path(input_mask_dir) / frame["mask_path"]
         mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
         if np.all(mask > 0):
@@ -134,9 +189,32 @@ def main(args):
         else:
             input_transforms_path = scene.dslr_dir / input_transforms_path
 
+        input_depth_dir = cfg.get("input_depth_dir", None)
+        if input_depth_dir is None:
+            input_depth_dir = scene.dslr_dir / 'render_depth'
+        else:
+            input_depth_dir = scene.dslr_dir / input_depth_dir
+
+        input_normal_dir = cfg.get("input_normal_dir", None)
+        if input_normal_dir is None:
+            pass # no need to undistort semantic
+        else:
+            input_normal_dir = scene.dslr_dir / input_normal_dir
+        
+        input_semantic_dir = cfg.get("input_semantic_dir", None)
+        if input_semantic_dir is None:
+            pass # no need to undistort semantic
+        else:
+            input_semantic_dir = scene.dslr_dir / input_semantic_dir
+        
         out_image_dir = scene.dslr_dir / cfg.out_image_dir
         out_mask_dir = scene.dslr_dir / cfg.out_mask_dir
+        out_depth_dir = scene.dslr_dir / cfg.out_depth_dir
+        out_normal_dir = scene.dslr_dir / cfg.out_normal_dir
+        out_semantic_dir = scene.dslr_dir / cfg.out_semantic_dir
         out_transforms_path = scene.dslr_dir / cfg.out_transforms_path
+
+        semantic_palette = np.loadtxt(cfg['palette_path'], dtype=np.uint8)
 
         transforms = load_json(input_transforms_path)
         assert len(transforms["frames"]) > 0
@@ -181,9 +259,16 @@ def main(args):
             width,
             distortion_params,
             input_image_dir,
+            input_depth_dir,
+            input_normal_dir,
+            input_semantic_dir,
             input_mask_dir,
             out_image_dir,
+            out_depth_dir,
+            out_normal_dir,
+            out_semantic_dir,
             out_mask_dir,
+            semantic_palette
         )
         new_trasforms = update_transforms_json(transforms, new_K, height, width)
         out_transforms_path.parent.mkdir(parents=True, exist_ok=True)

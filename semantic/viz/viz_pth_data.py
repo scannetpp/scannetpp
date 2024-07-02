@@ -52,21 +52,22 @@ def main(args):
         if cfg.viz_semantic:
             labels = pth_data[f'{prop_type}labels']
             
-            viz_color = np.ones((len(labels), 3)) * 255 * 0.8
+            # viz_color = np.ones((len(labels), 3)) * 255 * 0.8
+            viz_color = np.zeros((len(labels), 3))
             valid_labels = labels != cfg.ignore_label
             viz_color[valid_labels] = palette[labels[valid_labels] % len(palette)]
             
             suffix = cfg.output_suffix.semantic
-            out_fname = f'{scene_id}{suffix}.ply'
+            out_fname = f'{scene_id}{suffix}_{prop_type}'
 
             if cfg.viz_pc:
                 pc = o3d.geometry.PointCloud()
                 pc.points = o3d.utility.Vector3dVector(vtx)
                 pc.colors = o3d.utility.Vector3dVector(viz_color / 255.0)
-                o3d.io.write_point_cloud(str(out_dir / out_fname), pc)
+                o3d.io.write_point_cloud(str(out_dir / out_fname)+'pc.ply', pc)
             if cfg.viz_mesh:
                 mesh.vertex_colors = o3d.utility.Vector3dVector(viz_color / 255.0)
-                o3d.io.write_triangle_mesh(str(out_dir / out_fname), mesh)
+                o3d.io.write_triangle_mesh(str(out_dir / out_fname)+'mesh.ply', mesh)
         
         if cfg.viz_instances:
             # viz instances
@@ -75,18 +76,17 @@ def main(args):
             viz_inst_color = np.ones((len(inst_labels), 3)) * 255 * 0.8
             valid_inst_labels = inst_labels != cfg.ignore_label
             viz_inst_color[valid_inst_labels] = palette[inst_labels[valid_inst_labels] % len(palette)]
-            
             suffix = cfg.output_suffix.instance
-            out_fname = f'{scene_id}{suffix}.ply'
+            out_fname = f'{scene_id}{suffix}_{prop_type}'
 
             if cfg.viz_pc:
                 inst_pc = o3d.geometry.PointCloud()
                 inst_pc.points = o3d.utility.Vector3dVector(vtx)
                 inst_pc.colors = o3d.utility.Vector3dVector(viz_inst_color / 255.0)
-                o3d.io.write_point_cloud(str(out_dir / out_fname), inst_pc)
+                o3d.io.write_point_cloud(str(out_dir / out_fname)+'pc.ply', inst_pc)
             if cfg.viz_mesh:
                 mesh.vertex_colors = o3d.utility.Vector3dVector(viz_inst_color / 255.0)
-                o3d.io.write_triangle_mesh(str(out_dir / out_fname), mesh)
+                o3d.io.write_triangle_mesh(str(out_dir / out_fname)+'mesh.ply', mesh)
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser()
