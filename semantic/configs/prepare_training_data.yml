@@ -14,7 +14,7 @@ data:
 
   mapping_file: ../scans/metadata/semantic_benchmark/map_benchmark.csv
 
-  list_path:
+  list_path: ../scans/semantics-nyu40/pth/pth_lis.txt
 
   ignore_label: -100
 

@@ -21,7 +21,7 @@ ignore_label: -100
 splits: [nvs_sem_train, nvs_sem_val]
 
 # Specify scene ids if you want to render depth for specific scenes
-scene_ids: [0d2ee665be, 3f15a9266d]
+scene_ids: [8b5caf3398, b20a261fdf, 0d2ee665be, 3f15a9266d]
 
 # The near and far planes for the depth camera during rendering in meters.
 near: 0.05

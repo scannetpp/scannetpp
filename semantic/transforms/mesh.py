@@ -66,7 +66,7 @@ class MapLabelToIndex:
                 labels_mapping_lis[label] = [label_ndx, self.class_names[label_ndx] if label_ndx>-1 else 'Void']
 
         scene_id = sample['scene_id']
-        label_mapping_json = f'../scans/semantics_NYU40/{scene_id}_mapping.json'
+        label_mapping_json = f'../scans/semantics-nyu40/{scene_id}_mapping.json'
         with open(label_mapping_json, 'w') as f:
             import json
             json.dump(labels_mapping_lis, f)

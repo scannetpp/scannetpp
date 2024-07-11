@@ -6,9 +6,9 @@ imageio
 lz4
 opencv-python
 Pillow
---find-links https://download.pytorch.org/whl/torch_stable.html
-torch==1.13.1+cu116
-torchvision==0.14.1+cu116
-torchmetrics==1.2.0
+# --find-links https://download.pytorch.org/whl/torch_stable.html
+# torch==1.13.1+cu116
+# torchvision==0.14.1+cu116
+# torchmetrics==1.2.0
 scipy
 open3d

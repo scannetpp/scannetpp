@@ -153,8 +153,8 @@ def main(args):
                 # Select vertices' semantic labels using majority vote
                 if cfg.get("render_semantics", False):
                     vert_labels = np.where(vert_indices>0, semantic_mesh[vert_indices], -100) # Unlabeled vertices have value -100
-                    # semantic = scipy.stats.mode(vert_labels, axis=-1).mode 
-                    semantic = vert_labels[...,0] # Mode is quite time expensive, to be faster you can just select the first, although you will lose accuracy
+                    semantic = scipy.stats.mode(vert_labels, axis=-1).mode 
+                    # semantic = vert_labels[...,0] # Mode is quite time expensive, to be faster you can just select the first, although you will lose accuracy
                     
                     # labels re-mapping
                     (h, w) = semantic.shape

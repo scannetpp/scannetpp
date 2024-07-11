@@ -3,7 +3,7 @@ data_root: ../scans/
 
 splits: [nvs_sem_train, nvs_sem_val]
 
-scene_ids: [8b5caf3398]
+scene_ids: 8b5caf3398, b20a261fdf, 0d2ee665be, 3f15a9266d
 
 # The following paths should be given relative to the DATA_ROOT/dslr/
 # If not given, will use the default directory defined in ScannetppScene class

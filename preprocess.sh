@@ -21,3 +21,10 @@
 # python -m semantic.prep.prepare_semantic_gt semantic/configs/prepare_semantic_gt.yml
 # Rasterize 3D Semantics onto 2D Images
 # python -m semantic.prep.rasterize_semantics_2d semantic/configs/rasterize_semantics_2d.yml
+
+sleep 3600
+
+python -m common.render common/configs/render.yml
+python -m dslr.undistort dslr/configs/undistort.yml
+# python -m semantic.prep.prepare_training_data semantic/configs/prepare_training_data.yml
+# python -m semantic.viz.viz_pth_data semantic/configs/viz_pth_data.yml
