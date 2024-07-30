@@ -7,11 +7,11 @@ pick all the points within these chunks and save to separate files
 '''
 
 from pathlib import Path
-from scannetpp.common.utils.utils import read_txt_list
+from common.utils.utils import read_txt_list
 import torch
 from tqdm import tqdm
 import argparse
-from utils.file_io import load_yaml_munch
+from common.file_io import load_yaml_munch
 
 
 def main(args):
@@ -35,6 +35,8 @@ def main(args):
     split_list = read_txt_list(cfg.orig_list_path)
     # list of all chunk files
     out_split_list = []
+
+    few_points, few_labels, few_instances = [], [], []
 
     # vertices or sampled points?
     prop_type = cfg.prop_type
@@ -75,14 +77,18 @@ def main(args):
                 # get all points within chunk
                 keep_ndx = (coords[:, 0] >= x_start) & (coords[:, 0] < x_end) & (coords[:, 1] >= y_start) & (coords[:, 1] < y_end)
 
+                out_scene_id = f'{scene_id}_{chunk_ndx}'
+
                 # no points in chunk
                 if keep_ndx.sum() == 0:
                     continue
                 # keep only chunks with min #points
                 if keep_ndx.sum() < cfg.n_points_threshold:
+                    few_points.append(out_scene_id)
                     continue
                 # keep only chunks with min #unique labels
                 if len(torch.unique(torch.LongTensor(pth_data[f'{prop_type}labels'][keep_ndx]))) <= cfg.n_labels_threshold:
+                    few_labels.append(out_scene_id)
                     continue
 
                 # IDs of complete instances
@@ -104,15 +110,15 @@ def main(args):
 
                 # keep only chunks with min #complete instances
                 if len(complete_instances) <= cfg.n_instances_threshold:
+                    few_instances.append(out_scene_id)
                     continue
 
                 # get the number of instances in this chunk
                 # some of them might have been removed by the previous step
                 # in case not checking for complete instances
                 if len(torch.unique(torch.LongTensor(pth_data[f'{prop_type}instance_labels'][keep_ndx]))) <= cfg.n_instances_threshold:
+                    few_instances.append(out_scene_id)
                     continue
-
-                out_scene_id = f'{scene_id}_{chunk_ndx}'
 
                 # keep all the vertex properties
                 pth_data_chunk['scene_id'] = out_scene_id
@@ -147,6 +153,11 @@ def main(args):
     with open(cfg.out_list_path, 'w') as f:
         for scene_id in out_split_list:
             f.write(scene_id + '\n')
+
+    print('Total discarded chunks:', len(few_points) + len(few_labels) + len(few_instances))
+    print('Few points:', len(few_points))
+    print('Few labels:', len(few_labels))
+    print('Few instances:', len(few_instances))
 
 
 if __name__ == '__main__':
