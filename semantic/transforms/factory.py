@@ -1,5 +1,5 @@
 from semantic.transforms.common import Compose
-from semantic.transforms.mesh import AddVertexNormals, MapLabelToIndex, SamplePointsOnMesh, \
+from semantic.transforms.mesh import AddSegmentIDs, AddVertexNormals, MapLabelToIndex, SamplePointsOnMesh, \
              GetLabelsOnVertices, AddMeshVertices
 
 
@@ -23,6 +23,10 @@ def get_transform(data_cfg):
         transforms.append(GetLabelsOnVertices(data_cfg.ignore_label, data_cfg.get('multilabel'),
                                               use_instances=data_cfg.use_instances,
                                               instance_labels_path=data_cfg.instance_labels_path))
+        
+    # add segment ID for each vertex from the segments file
+    if 'add_segment_ids' in transforms_list:
+        transforms.append(AddSegmentIDs())
         
     # add vtx_normals from the o3d mesh
     if 'add_normals' in transforms_list:

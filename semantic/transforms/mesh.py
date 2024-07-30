@@ -59,6 +59,16 @@ class MapLabelToIndex:
 
         return sample
 
+class AddSegmentIDs:
+    def __init__(self):
+        pass
+    
+    def __call__(self, sample):
+        seg_indices = np.array(sample['segments']['segIndices'], dtype=np.uint32)
+        sample['vtx_segment_ids'] = seg_indices
+        
+        return sample
+
 class AddVertexNormals:
     def __init__(self):
         pass
