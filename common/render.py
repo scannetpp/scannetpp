@@ -66,8 +66,8 @@ def main(args):
 
             near = cfg.get("near", 0.05)
             far = cfg.get("far", 20.0)
-            rgb_dir = Path(cfg.output_dir) / scene_id / device / "render_rgb"
-            depth_dir = Path(cfg.output_dir) / scene_id / device / "render_depth"
+            rgb_dir = output_dir / scene_id / device / "render_rgb"
+            depth_dir = output_dir / scene_id / device / "render_depth"
             rgb_dir.mkdir(parents=True, exist_ok=True)
             depth_dir.mkdir(parents=True, exist_ok=True)
             for image_id, image in tqdm(images.items(), f"Rendering {device} images"):
