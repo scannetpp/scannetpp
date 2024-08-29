@@ -119,6 +119,10 @@ class ScannetppScene_Release:
     @property
     def dslr_nerfstudio_transform_path(self):
         return self.dslr_dir / 'nerfstudio' / 'transforms.json'
+
+    @property
+    def dslr_nerfstudio_undistorted_transform_path(self):
+        return self.dslr_dir / 'nerfstudio' / 'transforms_undistorted.json'
     
     @property
     def dslr_train_test_lists_path(self):
