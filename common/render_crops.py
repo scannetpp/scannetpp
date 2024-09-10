@@ -89,7 +89,6 @@ def main(args):
             depth_dir.mkdir(parents=True, exist_ok=True)
             crop_dir.mkdir(parents=True, exist_ok=True)
 
-            temp = 0
             for image_id, image in tqdm(images.items(), f"Rendering object crops using {device} images"):
                 world_to_camera = image.world_to_camera
 
@@ -111,10 +110,6 @@ def main(args):
                     mask = pix_instance == obj
                     crop = crop_rgb_mask(rgb, mask, inflate_px=50)
                     crop_heaps[obj].push(crop)
-
-                temp += 1
-                if temp == 30:
-                    break
 
 
                 # instance_rgb = instance_rgb.astype(np.uint8)
