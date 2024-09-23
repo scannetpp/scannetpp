@@ -82,6 +82,14 @@ def mask_to_bbox(mask, inflate_px=0):
     min_row, max_row = rows.min(), rows.max()
     min_col, max_col = cols.min(), cols.max()
 
+    # Detect if original bbox touches border (before inflate)
+    h, w = mask.shape[:2]
+    touches_top = min_row <= 0
+    touches_bottom = max_row >= h - 1
+    touches_left = min_col <= 0
+    touches_right = max_col >= w - 1
+    touches_border = touches_left | touches_right | touches_top | touches_bottom
+
     # Inflate the bounding box
     min_row -= inflate_px
     max_row += inflate_px
@@ -94,13 +102,18 @@ def mask_to_bbox(mask, inflate_px=0):
     min_col = max(min_col, 0)
     max_col = min(max_col, mask.shape[1] - 1)
 
-    return (min_row, max_row, min_col, max_col)
+    return (min_row, max_row, min_col, max_col), touches_border
 
-def crop_rgb_mask(rgb, mask, inflate_px=0):
-    x_min, x_max, y_min, y_max = mask_to_bbox(mask, inflate_px=inflate_px)
+def crop_rgb_mask(rgb, mask, inflate_px=0, border_penalty_factor=.1):
+    (x_min, x_max, y_min, y_max), touches_border = mask_to_bbox(mask, inflate_px=inflate_px)
     rgb, mask = rgb[x_min:x_max, y_min:y_max], mask[x_min:x_max, y_min:y_max]
+    
+    score = mask.sum()
 
-    return Crop(rgb, mask, mask.sum())
+    if touches_border:
+        score *= border_penalty_factor
+
+    return Crop(rgb, mask, score)
 
 
 def plot_grid_images(
