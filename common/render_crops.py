@@ -108,7 +108,7 @@ def main(args):
 
                 for obj in objs:
                     mask = pix_instance == obj
-                    crop = crop_rgb_mask(rgb, mask, inflate_px=50)
+                    crop = crop_rgb_mask(rgb, mask, inflate_px=100)
                     crop_heaps[obj].push(crop)
 
 
