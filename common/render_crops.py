@@ -134,7 +134,7 @@ def main(args):
         for id, entry in tqdm(crop_heaps.items(), f"Rendering image grids"):
             heap = entry["heap"]
             label = entry["label"]
-            if len(heap) and label.lower() not in ["wall", "floor", "ceiling", "split", "remove"]:
+            if len(heap) and label.lower() not in ["background", "wall", "floor", "ceiling", "split", "remove"]:
                 crops = heap.get_sorted()
                 rgbs = [c.rgb for c in crops]
                 masks = [c.mask for c in crops]
