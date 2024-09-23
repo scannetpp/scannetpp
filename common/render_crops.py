@@ -56,10 +56,23 @@ def main(args):
         # Load annotations
         segments_anno = json.load(open(scene.scan_anno_json_path, "r"))
         n_objects = len(segments_anno["segGroups"])
-        crop_heaps = [CropHeap(max_size=4) for _ in range(n_objects + 1)] 
         instance_colors = np.random.randint(low=0, high=256, size=(n_objects + 1, 3), dtype=np.uint8)
         instance_colors[0] = 255 # White bg
         vert_to_obj = vert_to_obj_lookup(segments_anno)
+
+        # Crop heaps
+        crop_heaps = dict()
+        for obj in segments_anno["segGroups"]:
+            crop_heaps[obj["id"]] = dict()
+            crop_heaps[obj["id"]]["label"] = obj["label"]
+            crop_heaps[obj["id"]]["heap"] = CropHeap(max_size=4)
+
+        # Background class is 0
+        assert 0 not in crop_heaps
+        crop_heaps[0] = dict()
+        crop_heaps[0]["label"] = "BACKGROUND"
+        crop_heaps[0]["heap"] = CropHeap(max_size=4)
+
 
         for device in render_devices:
             if device == "dslr":
@@ -89,6 +102,7 @@ def main(args):
             depth_dir.mkdir(parents=True, exist_ok=True)
             crop_dir.mkdir(parents=True, exist_ok=True)
 
+            i = 0
             for image_id, image in tqdm(images.items(), f"Rendering object crops using {device} images"):
                 world_to_camera = image.world_to_camera
 
@@ -109,7 +123,11 @@ def main(args):
                 for obj in objs:
                     mask = pix_instance == obj
                     crop = crop_rgb_mask(rgb, mask, inflate_px=100)
-                    crop_heaps[obj].push(crop)
+                    crop_heaps[obj]["heap"].push(crop)
+
+                i += 1
+                if i > 40:
+                    break
 
 
                 # instance_rgb = instance_rgb.astype(np.uint8)
@@ -118,13 +136,14 @@ def main(args):
                 # depth_name = image.name.split(".")[0] + ".png"
                 # imageio.imwrite(depth_dir / depth_name, depth)
 
-        for i, heap in tqdm(enumerate(crop_heaps), f"Rendering image grids"):
+        for id, entry in tqdm(crop_heaps.items(), f"Rendering image grids"):
+            heap = entry["heap"]
             if len(heap):
                 crops = heap.get_sorted()
                 rgbs = [c.rgb for c in crops]
                 masks = [c.mask for c in crops]
-                plot_grid_images(rgbs + masks, grid_width=len(rgbs))
-                plt.savefig(crop_dir / f"{str(i).zfill(5)}.jpg")
+                plot_grid_images(rgbs + masks, grid_width=len(rgbs), title=entry["label"])
+                plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
                 plt.close()
 
 
