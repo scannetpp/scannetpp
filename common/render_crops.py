@@ -102,11 +102,10 @@ def main(args):
             depth_dir.mkdir(parents=True, exist_ok=True)
             crop_dir.mkdir(parents=True, exist_ok=True)
 
-            i = 0
-            for image_id, image in tqdm(images.items(), f"Rendering object crops using {device} images"):
+            for _, image in tqdm(images.items(), f"Rendering object crops using {device} images"):
                 world_to_camera = image.world_to_camera
 
-                rgb_rendered, _, vert_indices = render_engine.renderAll(world_to_camera, near, far)
+                _, _, vert_indices = render_engine.renderAll(world_to_camera, near, far)
 
                 iphone_rgb_path = Path(scene.iphone_rgb_dir) / image.name
                 rgb = np.asarray(imageio.imread(iphone_rgb_path))
@@ -124,10 +123,6 @@ def main(args):
                     mask = pix_instance == obj
                     crop = crop_rgb_mask(rgb, mask, inflate_px=100)
                     crop_heaps[obj]["heap"].push(crop)
-
-                i += 1
-                if i > 40:
-                    break
 
 
                 # instance_rgb = instance_rgb.astype(np.uint8)
