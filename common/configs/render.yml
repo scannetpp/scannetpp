@@ -1,5 +1,5 @@
 # folder where the data is downloaded
-data_root: DATA_ROOT
+data_root: /data/concept-graphs/scannetpp
 
 # Set True to render depth for iphone frames
 render_iphone: True
@@ -9,11 +9,11 @@ render_dslr: False
 splits: [nvs_sem_train, nvs_sem_val]
 
 # Specify scene ids if you want to render depth for specific scenes
-# scene_ids: [355e5e32db]
+scene_ids: [c0f5742640]
 
 # The near and far planes for the depth camera during rendering in meters.
 near: 0.05
 far: 20.0
 
 # Output directory for the rendered depth images. If not given, the output will be saved to data folder in data_root
-# output_dir: OUTPUT_DIR
+output_dir: /data/concept-graphs/scannetpp/data

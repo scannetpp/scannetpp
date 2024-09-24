@@ -2,6 +2,8 @@ from typing import List, Union
 import matplotlib.pyplot as plt
 import heapq
 import numpy as np
+import cv2
+
 
 def vert_to_obj_lookup(segments_anno):
     # Find max
@@ -10,12 +12,13 @@ def vert_to_obj_lookup(segments_anno):
         vert_max = max(vert_max, max(obj["segments"]))
 
     # Objects start at 1 so use 0 for background
-    lookup = np.zeros(shape=vert_max +1, dtype=np.uint32)
+    lookup = np.zeros(shape=vert_max + 1, dtype=np.uint32)
     for obj in segments_anno["segGroups"]:
         for vert in obj["segments"]:
-            lookup[vert] = obj["id"] 
+            lookup[vert] = obj["id"]
 
     return lookup
+
 
 class Crop:
     def __init__(
@@ -30,7 +33,6 @@ class Crop:
 
     def __lt__(self, other):
         return self.score < other.score
-
 
 
 class CropHeap:
@@ -63,10 +65,11 @@ class CropHeap:
     def get_sorted(self) -> List[Crop]:
         return sorted(self.heap, key=lambda x: x.score, reverse=True)
 
+
 def mask_to_bbox(mask, inflate_px=0):
     # Ensure the input is a numpy array
     mask = np.asarray(mask)
-    
+
     # Find indices where mask is non-zero
     non_zero_indices = np.nonzero(mask)
 
@@ -104,11 +107,51 @@ def mask_to_bbox(mask, inflate_px=0):
 
     return (min_row, max_row, min_col, max_col), touches_border
 
-def crop_rgb_mask(rgb, mask, inflate_px=0, border_penalty_factor=.1):
-    (x_min, x_max, y_min, y_max), touches_border = mask_to_bbox(mask, inflate_px=inflate_px)
+
+def compute_optical_flow_score(rgb, rgb_rendered) -> float:
+    """
+    Computes a score based on optical flow magnitude between two images.
+
+    Parameters:
+    - rgb: Original RGB image (numpy array).
+    - rgb_rendered: Rendered RGB image (numpy array).
+
+    Returns:
+    - score: A float score where lower optical flow magnitudes yield higher scores.
+    """
+
+    # Convert the images to grayscale
+    gray_rgb = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    gray_rgb_rendered = cv2.cvtColor(rgb_rendered, cv2.COLOR_RGB2GRAY)
+
+    # scale down by 3 for faster computation
+    gray_rgb = cv2.resize(gray_rgb, None, fx=1 / 4, fy=1 / 4)
+    gray_rgb_rendered = cv2.resize(gray_rgb_rendered, None, fx=1 / 4, fy=1 / 4)
+
+    # Compute the optical flow between the two grayscale images
+    flow = cv2.calcOpticalFlowFarneback(
+        gray_rgb, gray_rgb_rendered, None, 0.5, 2, 15, 3, 5, 1.2, 0
+    )
+
+    # Compute the magnitude of the optical flow vectors
+    magnitude, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
+    avg_mismatch = np.mean(magnitude)
+    score = 1 / (avg_mismatch + 1e-6)  # Add small value to avoid division by zero
+
+    return score
+
+
+def crop_rgb_mask(rgb, rgb_rendered, mask, inflate_px=0, border_penalty_factor=0.1):
+    # optical_flow_score = compute_optical_flow_score(rgb, rgb_rendered)
+    # optical_flow_score = 1.0
+
+    (x_min, x_max, y_min, y_max), touches_border = mask_to_bbox(
+        mask, inflate_px=inflate_px
+    )
     rgb, mask = rgb[x_min:x_max, y_min:y_max], mask[x_min:x_max, y_min:y_max]
-    
+
     score = mask.sum()
+    # score *= optical_flow_score
 
     if touches_border:
         score *= border_penalty_factor
