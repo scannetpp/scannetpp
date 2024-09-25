@@ -160,30 +160,43 @@ def crop_rgb_mask(rgb, rgb_rendered, mask, inflate_px=0, border_penalty_factor=0
 
 
 def plot_grid_images(
-    images: List[Union[np.ndarray]],
-    masks: List[np.ndarray] = None,
+    images: List[np.ndarray],
+    masks: List[np.ndarray],
     grid_width: int = 4,
     title: str = "",
 ) -> None:
     n_images = len(images)
-    grid_height = int(np.ceil(n_images / grid_width))
-    mask_color = (np.random.rand(3) * 255).astype(np.uint8).reshape((1, 3))
-
+    grid_height = 3
     fig, axs = plt.subplots(
-        grid_height, grid_width, figsize=(grid_width * 4, grid_height * 4)
+        grid_height,
+        grid_width,
+        figsize=(
+            grid_width * 4,
+            grid_height * 4,
+        ),
     )
 
-    for i, ax in enumerate(axs.flat):
-        if i < n_images:
-            img = images[i]
-            ax.imshow(img)
-            if masks is not None:
-                mask = masks[i]
-                mask = mask[:, :, np.newaxis] * mask_color
-                ax.imshow(mask, alpha=0.5)
-            ax.axis("off")
-        else:
-            ax.axis("off")
+    for i in range(grid_width):
+        if i >= n_images:
+            break  # If fewer images than grid_width, break
+
+        img = images[i]
+        mask = masks[i]
+
+        axs[0, i].imshow(img)
+        axs[0, i].axis("off")
+
+        axs[1, i].imshow(mask, cmap="viridis")  # Display binary mask
+        axs[1, i].axis("off")
+
+        masked_img = img.copy()
+        masked_img[mask == 0] = [
+            255,
+            255,
+            255,
+        ]  # Set the background to white where mask is 0
+        axs[2, i].imshow(masked_img)
+        axs[2, i].axis("off")
 
     plt.tight_layout()
     plt.suptitle(title, fontsize=30)
