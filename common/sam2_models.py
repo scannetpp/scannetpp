@@ -81,18 +81,14 @@ class SAM2VideoMaskModel:
 
         if mode == "points":
             points, labels, highest_score_idx = self._get_initial_prompts(points=True)
-            _ = self.refine_mask_w_points_prompt(
-                self.predictor_inference_state, points, labels, highest_score_idx
-            )
+            _ = self.refine_mask_w_points_prompt(points, labels, highest_score_idx)
             refined_masks = self.propagate_prompt()
             self.masks = refined_masks
             return refined_masks
 
         elif mode == "mask":
             highest_score_mask, highest_score_idx = self._get_initial_prompts(mask=True)
-            _ = self.refine_mask_w_mask_prompt(
-                self.predictor_inference_state, highest_score_mask, highest_score_idx
-            )
+            _ = self.refine_mask_w_mask_prompt(highest_score_mask, highest_score_idx)
             refined_masks = self.propagate_prompt()
             self.masks = refined_masks
             return refined_masks
@@ -379,7 +375,7 @@ class SAM2ImageMaskModel:
         masks_refined = []
         sam_scores = []
 
-        for idx, (rgb, mask) in enumerate(zip(self.rgb, self.mask)):
+        for idx, (rgb, mask) in enumerate(zip(self.rgbs, self.masks)):
             best_score = -float("inf")
             best_mask = None
 
