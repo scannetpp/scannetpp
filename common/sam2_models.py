@@ -50,11 +50,17 @@ class SAM2VideoMaskModel:
 
         self.num_points = num_points
         self.predictor_inference_state = None
+        self.refined_flag = False
 
     def store_data(self, rgbs, masks, scores):
         """
         Pads the RGB images and masks to the size of the largest image and stores them.
         """
+        if self.predictor_inference_state is not None:
+            raise ValueError(
+                "Inference state already initialized. Please cleanup before storing new data."
+            )
+
         if len(rgbs) != len(masks) or len(rgbs) != len(scores):
             raise ValueError("The number of RGB images, masks, and scores must match.")
 
@@ -100,6 +106,10 @@ class SAM2VideoMaskModel:
         """
         Reset the inference state to the initial state.
         """
+        self.refined_flag = False
+        if self.predictor_inference_state is None:
+            raise ValueError("Inference state is not set.")
+
         self.predictor.reset_state(self.predictor_inference_state)
         self.predictor_inference_state = self._initialize_inference_state()
 
@@ -107,8 +117,10 @@ class SAM2VideoMaskModel:
         """
         Clean up the temporary directory and clear stored data.
         """
-        self.predictor.reset_state(self.predictor_inference_state)
-        self.predictor_inference_state = None
+        self.refined_flag = False
+        if self.predictor_inference_state is not None:
+            self.predictor.reset_state(self.predictor_inference_state)
+            self.predictor_inference_state = None
         self._clear_temp_directory()
         self._clear_storage()
 
@@ -116,6 +128,16 @@ class SAM2VideoMaskModel:
         """
         Refine the masks with point prompts.
         """
+        if frame_idx >= len(self.rgbs):
+            raise ValueError("Invalid frame index provided.")
+
+        if self.predictor_inference_state is None:
+            raise ValueError(
+                "Inference state not initialized. Please store data before refining masks."
+            )
+
+        self.refined_flag = True
+
         _, _, out_mask_logits = self.predictor.add_new_points_or_box(
             inference_state=self.predictor_inference_state,
             frame_idx=frame_idx,
@@ -134,6 +156,16 @@ class SAM2VideoMaskModel:
         """
         Refine the masks using the mask with the highest score.
         """
+        if frame_idx >= len(self.rgbs):
+            raise ValueError("Invalid frame index provided.")
+
+        if self.predictor_inference_state is None:
+            raise ValueError(
+                "Inference state not initialized. Please store data before refining masks."
+            )
+
+        self.refined_flag = True
+
         _, _, out_mask_logits = self.predictor.add_new_mask(
             inference_state=self.predictor_inference_state,
             frame_idx=frame_idx,
@@ -151,6 +183,16 @@ class SAM2VideoMaskModel:
         Propagate the prompt through the video.
         """
         refined_masks = []
+
+        if self.predictor_inference_state is None:
+            raise ValueError(
+                "Inference state not initialized. Please store data before refining masks."
+            )
+
+        if not self.refined_flag:
+            raise ValueError(
+                "Refinement not performed. Please refine masks before propagating."
+            )
 
         for (
             out_frame_idx,
@@ -327,6 +369,11 @@ class SAM2ImageMaskModel:
         """
         Stores the RGB images, masks, and scores.
         """
+        if self.rgbs or self.masks or self.scores:
+            raise ValueError(
+                "Stored data already exists. Please cleanup before storing new data."
+            )
+
         if len(rgbs) != len(masks) or len(rgbs) != len(scores):
             raise ValueError("The number of RGB images, masks, and scores must match.")
 
@@ -337,6 +384,9 @@ class SAM2ImageMaskModel:
         """
         Public method to trigger RANSAC-based mask refinement.
         """
+        if not self.rgbs or not self.masks or not self.scores:
+            raise ValueError("No stored data to refine masks for.")
+
         masks_refined, sam_scores = self._ransac_mask_selection()
         self.masks = masks_refined
         self.scores = sam_scores
@@ -346,6 +396,11 @@ class SAM2ImageMaskModel:
         """
         Refine the mask for the provided frame index.
         """
+        if not self.rgbs or not self.masks or not self.scores:
+            raise ValueError("No stored data to refine masks for.")
+        if frame_idx >= len(self.rgbs):
+            raise ValueError("Invalid frame index provided.")
+
         rgb = self.rgbs[frame_idx]
         bbox = None
 
