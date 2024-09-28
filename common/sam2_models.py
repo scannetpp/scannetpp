@@ -20,7 +20,9 @@ logging.basicConfig(
 
 
 class SAM2VideoMaskModel:
-    def __init__(self, sam2_checkpoint, model_cfg, num_points=5, device="cuda"):
+    def __init__(
+        self, sam2_checkpoint, model_cfg, num_points=5, device="cuda", temp_dir=None
+    ):
         """
         Initialize SAM2 model and set device.
         """
@@ -28,35 +30,28 @@ class SAM2VideoMaskModel:
         if self.device.type == "cuda":
             torch.autocast("cuda", dtype=torch.bfloat16).__enter__()
 
-        self.predictor = self._build_predictor(sam2_checkpoint, model_cfg)
-        self._initialize_storage()
-        self.num_points = num_points
-
-    def _build_predictor(self, sam2_checkpoint, model_cfg):
-        """
-        Helper function to build the SAM2 video predictor.
-        """
-        return build_sam2_video_predictor(
+        self.predictor = build_sam2_video_predictor(
             model_cfg, sam2_checkpoint, device=self.device
         )
 
-    def _initialize_storage(self):
-        """
-        Initializes temporary directory and storage for RGB images, masks, and related data.
-        """
-        self.temp_dir = tempfile.mkdtemp()
-        logging.info(f"Temporary directory created at: {self.temp_dir}")
-
-        # Placeholder for resized images, masks, padded_masks, rgb_padded, padding information, and scores
+        # Placeholder for rgbs, masks, masks_padded, rgbs_padded, padding information, and scores
         self.rgbs = []
         self.rgbs_padded = []
         self.masks = []
         self.masks_padded = []
-        self.masks_refined = []
         self.padding_info = []
         self.scores = []
 
-    def pad_and_store(self, rgbs, masks, scores):
+        if temp_dir is None:
+            self.temp_dir = tempfile.mkdtemp()
+        else:
+            self.temp_dir = temp_dir
+        logging.info(f"Temporary directory created at: {self.temp_dir}")
+
+        self.num_points = num_points
+        self.predictor_inference_state = None
+
+    def store_data(self, rgbs, masks, scores):
         """
         Pads the RGB images and masks to the size of the largest image and stores them.
         """
@@ -72,6 +67,119 @@ class SAM2VideoMaskModel:
             self._store_padded_data(
                 idx, rgb, padded_rgb, mask, padded_mask, score, padding_info
             )
+
+        self.predictor_inference_state = self._initialize_inference_state()
+
+    def refine_masks_and_propagate(
+        self, mode=None, points=None, labels=None, frame_idx=None
+    ):
+        """
+        Refine masks using SAM2 predictor.
+        """
+        if self.predictor_inference_state is None:
+            raise ValueError(
+                "Inference state not initialized. Please store data before refining masks."
+            )
+
+        if mode == "points":
+            if points is None or labels is None or frame_idx is None:
+                points, labels, highest_score_idx = self._get_initial_prompts(
+                    points=True
+                )
+                self.refine_mask_w_points_prompt(
+                    self.predictor_inference_state, points, labels, highest_score_idx
+                )
+                self.propagate_prompt()
+            else:
+                self.refine_mask_w_points_prompt(
+                    self.predictor_inference_state, points, labels, frame_idx
+                )
+                self._propagate_prompt()
+        elif mode == "mask":
+            highest_score_mask, highest_score_idx = self._get_initial_prompts(mask=True)
+            self.refine_mask_w_mask_prompt(
+                self.predictor_inference_state, highest_score_mask, highest_score_idx
+            )
+            self.propagate_prompt()
+        else:
+            raise ValueError("Mode must be either 'points' or 'mask'.")
+
+    def reset_inference_state(self):
+        """
+        Reset the inference state to the initial state.
+        """
+        self.predictor.reset_state(self.predictor_inference_state)
+        self.predictor_inference_state = self._initialize_inference_state()
+
+    def cleanup(self):
+        """
+        Clean up the temporary directory and clear stored data.
+        """
+        self.predictor.reset_state(self.predictor_inference_state)
+        self.predictor_inference_state = None
+        self._clear_temp_directory()
+        self._clear_storage()
+
+    def refine_mask_w_points_prompt(self, points, labels, frame_idx):
+        """
+        Refine the masks with point prompts.
+        """
+        _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(
+            inference_state=self.predictor_inference_state,
+            frame_idx=frame_idx,
+            obj_id=1,
+            points=points,
+            labels=labels,
+            box=None,
+        )
+
+        refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
+        unpadded_refined_mask = self._unpad_mask(refined_mask, frame_idx)
+        self.masks[frame_idx] = unpadded_refined_mask
+
+    def refine_mask_w_mask_prompt(self, highest_score_mask, frame_idx):
+        """
+        Refine the masks using the mask with the highest score.
+        """
+        _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(
+            inference_state=self.predictor_inference_state,
+            frame_idx=frame_idx,
+            obj_id=1,
+            mask=highest_score_mask,
+        )
+
+        refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
+        unpadded_refined_mask = self._unpad_mask(refined_mask, frame_idx)
+        self.masks[frame_idx] = unpadded_refined_mask
+
+    def propagate_prompt(self):
+        """
+        Propagate the prompt through the video.
+        """
+        refined_masks = []
+
+        for (
+            out_frame_idx,
+            out_obj_ids,
+            out_mask_logits,
+        ) in self.predictor.propagate_in_video(self.predictor_inference_state):
+            refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
+            unpadded_refined_mask = self._unpad_mask(refined_mask, out_frame_idx)
+
+            if np.sum(refined_mask) == 0:
+                logging.warning(
+                    f"Refined mask is empty for frame {out_frame_idx}. Using the old mask."
+                )
+                refined_mask = self.masks_padded[out_frame_idx]
+
+            refined_masks.append(unpadded_refined_mask)
+
+        if len(refined_masks) < len(self.masks):
+            raise ValueError(
+                "The number of refined masks is less than the number of input masks."
+            )
+
+        self.masks = refined_masks
 
     def _get_max_dimensions(self, rgbs):
         """
@@ -114,44 +222,6 @@ class SAM2VideoMaskModel:
         self.scores.append(score)
         self.padding_info.append(padding_info)
 
-    def set_state_and_refine_masks(self):
-        """
-        Set the state for the SAM2 predictor and refine masks.
-        """
-        inference_state = self._initialize_inference_state()
-        points, labels, highest_score_idx = self._get_initial_prompts(points=True)
-
-        self._refine_masks(inference_state, points, labels, highest_score_idx)
-        self.predictor.reset_state(inference_state)
-
-    def set_state_and_refine_masks_w_mask_prompt(self):
-        """
-        Set the state for the SAM2 predictor and refine masks using the mask with the highest score.
-        """
-        inference_state = self._initialize_inference_state()
-        highest_score_mask, highest_score_idx = self._get_initial_prompts(mask=True)
-
-        self._refine_masks_w_mask_prompt(
-            inference_state, highest_score_mask, highest_score_idx
-        )
-        self.predictor.reset_state(inference_state)
-
-    def set_state_and_refine_masks_w_manual_prompt(self, points, labels, frame_idx):
-        """
-        Set the state for the SAM2 predictor and refine masks using the provided points and labels.
-        """
-        inference_state = self._initialize_inference_state()
-
-        # _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(
-        #     inference_state=inference_state,
-        #     frame_idx=frame_idx,
-        #     obj_id=1,
-        #     mask=self.masks_padded[frame_idx],
-        # )
-
-        self._refine_masks(inference_state, points, labels, frame_idx)
-        self.predictor.reset_state(inference_state)
-
     def _initialize_inference_state(self):
         """
         Initialize the predictor's inference state.
@@ -187,71 +257,6 @@ class SAM2VideoMaskModel:
         else:
             raise ValueError("Either points or mask must be True.")
 
-    def _refine_masks(self, inference_state, points, labels, highest_score_idx):
-        """
-        Refine the masks and propagate through frames.
-        """
-        _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(
-            inference_state=inference_state,
-            frame_idx=highest_score_idx,
-            obj_id=1,
-            points=points,
-            labels=labels,
-            box=None,
-        )
-
-        for (
-            out_frame_idx,
-            out_obj_ids,
-            out_mask_logits,
-        ) in self.predictor.propagate_in_video(inference_state):
-            refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
-
-            if np.sum(refined_mask) == 0:
-                logging.warning(
-                    f"Refined mask is empty for frame {out_frame_idx}. Using the old mask."
-                )
-                refined_mask = self.masks_padded[out_frame_idx]
-
-            self.masks_refined.append(refined_mask)
-
-    def _refine_masks_w_mask_prompt(
-        self, inference_state, highest_score_mask, highest_score_idx
-    ):
-        """
-        Refine the masks using the mask with the highest score and propagate through frames.
-        """
-        _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(
-            inference_state=inference_state,
-            frame_idx=highest_score_idx,
-            obj_id=1,
-            mask=highest_score_mask,
-        )
-
-        for (
-            out_frame_idx,
-            out_obj_ids,
-            out_mask_logits,
-        ) in self.predictor.propagate_in_video(inference_state):
-            refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
-
-            if np.sum(refined_mask) == 0:
-                logging.warning(
-                    f"Refined mask is empty for frame {out_frame_idx}. Using the old mask."
-                )
-                refined_mask = self.masks_padded[out_frame_idx]
-
-            self.masks_refined.append(refined_mask)
-
-    def unpad_masks_to_original_size(self):
-        """
-        Remove padding from refined masks to restore them to their original size.
-        """
-        self.masks_refined = [
-            self._unpad_mask(mask, frame_idx)
-            for frame_idx, mask in enumerate(self.masks_refined)
-        ]
-
     def _unpad_mask(self, mask, frame_idx):
         """
         Unpad a single mask based on its padding information.
@@ -266,13 +271,6 @@ class SAM2VideoMaskModel:
             unpadded_mask = unpadded_mask[:, : -pad_w[1]]
 
         return unpadded_mask
-
-    def cleanup(self):
-        """
-        Clean up the temporary directory and clear stored data.
-        """
-        self._clear_temp_directory()
-        self._clear_storage()
 
     def _clear_temp_directory(self):
         """
@@ -301,7 +299,6 @@ class SAM2VideoMaskModel:
         self.masks_padded = []
         self.scores = []
         self.padding_info = []
-        self.masks_refined = []
         logging.info(
             "Cleared all stored images, masks, scores, and padding information."
         )
