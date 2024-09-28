@@ -70,9 +70,7 @@ class SAM2VideoMaskModel:
 
         self.predictor_inference_state = self._initialize_inference_state()
 
-    def refine_masks_and_propagate(
-        self, mode=None, points=None, labels=None, frame_idx=None
-    ):
+    def refine_masks_and_propagate(self, mode=None):
         """
         Refine masks using SAM2 predictor.
         """
@@ -82,25 +80,23 @@ class SAM2VideoMaskModel:
             )
 
         if mode == "points":
-            if points is None or labels is None or frame_idx is None:
-                points, labels, highest_score_idx = self._get_initial_prompts(
-                    points=True
-                )
-                self.refine_mask_w_points_prompt(
-                    self.predictor_inference_state, points, labels, highest_score_idx
-                )
-                self.propagate_prompt()
-            else:
-                self.refine_mask_w_points_prompt(
-                    self.predictor_inference_state, points, labels, frame_idx
-                )
-                self._propagate_prompt()
+            points, labels, highest_score_idx = self._get_initial_prompts(points=True)
+            _ = self.refine_mask_w_points_prompt(
+                self.predictor_inference_state, points, labels, highest_score_idx
+            )
+            refined_masks = self.propagate_prompt()
+            self.masks = refined_masks
+            return refined_masks
+
         elif mode == "mask":
             highest_score_mask, highest_score_idx = self._get_initial_prompts(mask=True)
-            self.refine_mask_w_mask_prompt(
+            _ = self.refine_mask_w_mask_prompt(
                 self.predictor_inference_state, highest_score_mask, highest_score_idx
             )
-            self.propagate_prompt()
+            refined_masks = self.propagate_prompt()
+            self.masks = refined_masks
+            return refined_masks
+
         else:
             raise ValueError("Mode must be either 'points' or 'mask'.")
 
@@ -124,7 +120,7 @@ class SAM2VideoMaskModel:
         """
         Refine the masks with point prompts.
         """
-        _, out_obj_ids, out_mask_logits = self.predictor.add_new_points_or_box(
+        _, _, out_mask_logits = self.predictor.add_new_points_or_box(
             inference_state=self.predictor_inference_state,
             frame_idx=frame_idx,
             obj_id=1,
@@ -135,13 +131,14 @@ class SAM2VideoMaskModel:
 
         refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
         unpadded_refined_mask = self._unpad_mask(refined_mask, frame_idx)
-        self.masks[frame_idx] = unpadded_refined_mask
+
+        return unpadded_refined_mask
 
     def refine_mask_w_mask_prompt(self, highest_score_mask, frame_idx):
         """
         Refine the masks using the mask with the highest score.
         """
-        _, out_obj_ids, out_mask_logits = self.predictor.add_new_mask(
+        _, _, out_mask_logits = self.predictor.add_new_mask(
             inference_state=self.predictor_inference_state,
             frame_idx=frame_idx,
             obj_id=1,
@@ -150,7 +147,8 @@ class SAM2VideoMaskModel:
 
         refined_mask = (out_mask_logits[0] > 0.0).cpu().numpy().squeeze()
         unpadded_refined_mask = self._unpad_mask(refined_mask, frame_idx)
-        self.masks[frame_idx] = unpadded_refined_mask
+
+        return unpadded_refined_mask
 
     def propagate_prompt(self):
         """
@@ -179,7 +177,7 @@ class SAM2VideoMaskModel:
                 "The number of refined masks is less than the number of input masks."
             )
 
-        self.masks = refined_masks
+        return refined_masks
 
     def _get_max_dimensions(self, rgbs):
         """
@@ -329,6 +327,91 @@ class SAM2ImageMaskModel:
         self.predictor = self._build_predictor(sam2_checkpoint, model_cfg)
         self._initialize_storage()
 
+    def store_data(self, rgbs, masks, scores):
+        """
+        Stores the RGB images, masks, and scores.
+        """
+        if len(rgbs) != len(masks) or len(rgbs) != len(scores):
+            raise ValueError("The number of RGB images, masks, and scores must match.")
+
+        for idx, (rgb, mask, score) in enumerate(zip(rgbs, masks, scores)):
+            self._store_data(idx, rgb, mask, score)
+
+    def refine_masks(self):
+        """
+        Public method to trigger RANSAC-based mask refinement.
+        """
+        masks_refined, sam_scores = self._ransac_mask_selection()
+        self.masks = masks_refined
+        self.scores = sam_scores
+        return masks_refined, sam_scores
+
+    def refine_mask_w_point_prompt(self, frame_idx, points, labels):
+        """
+        Refine the mask for the provided frame index.
+        """
+        rgb = self.rgbs[frame_idx]
+        bbox = None
+
+        predicted_mask, predicted_scores = self._predict_mask(rgb, points, bbox, labels)
+
+        self.masks_refined[frame_idx] = predicted_mask[0]
+        self.scores[frame_idx] = predicted_scores[0]
+
+        return predicted_mask[0], predicted_scores[0]
+
+    def cleanup(self):
+        """
+        Cleans up the stored data, including RGBs, masks, and scores,
+        while keeping the SAM model ready for further use.
+        """
+        # Clear all stored data (RGBs, masks, scores)
+        self.rgbs = []
+        self.masks = []
+        self.scores = []
+
+        logging.info("Cleared all stored images, masks, scores, and refined masks.")
+
+    def _ransac_mask_selection(self):
+        """
+        Perform RANSAC-like sampling of points and select the best mask based on SAM score.
+        """
+        masks_refined = []
+        sam_scores = []
+
+        for idx, (rgb, mask) in enumerate(zip(self.rgb, self.mask)):
+            best_score = -float("inf")
+            best_mask = None
+
+            for _ in range(self.ransac_iterations):
+                try:
+                    # Sample points from the mask
+                    sampled_points = self._sample_points_from_mask(mask)
+                    labels = np.ones(len(sampled_points), dtype=np.int32)
+                    bbox = self._get_bounding_box_from_mask(mask)
+
+                    # Get mask prediction and score from SAM, assume single mask and score
+                    predicted_mask, predicted_scores = self._predict_mask(
+                        rgb, sampled_points, bbox, labels
+                    )
+
+                    predicted_mask = predicted_mask[0]
+
+                    score = predicted_scores[0]  # Assuming single mask is returned
+                    if score > best_score:
+                        best_score = score
+                        best_mask = predicted_mask
+
+                except ValueError as e:
+                    logging.warning(f"Skipping frame {idx} due to error: {e}")
+                    continue
+
+            # Store the best mask and score for the current frame
+            masks_refined.append(best_mask)
+            sam_scores.append(best_score)
+
+        return masks_refined, sam_scores
+
     def _build_predictor(self, sam2_checkpoint, model_cfg):
         """
         Helper function to build the SAM2 image predictor.
@@ -342,19 +425,7 @@ class SAM2ImageMaskModel:
         """
         self.rgbs = []
         self.masks = []
-        self.masks_refined = []
-        self.crop_scores = []
-        self.sam_scores = []
-
-    def store_data(self, rgbs, masks, scores):
-        """
-        Stores the RGB images, masks, and scores.
-        """
-        if len(rgbs) != len(masks) or len(rgbs) != len(scores):
-            raise ValueError("The number of RGB images, masks, and scores must match.")
-
-        for idx, (rgb, mask, score) in enumerate(zip(rgbs, masks, scores)):
-            self._store_data(idx, rgb, mask, score)
+        self.scores = []
 
     def _store_data(self, idx, rgb, mask, score):
         """
@@ -362,7 +433,7 @@ class SAM2ImageMaskModel:
         """
         self.rgbs.append(rgb)
         self.masks.append(mask)
-        self.crop_scores.append(score)
+        self.scores.append(score)
 
     def _sample_points_from_mask(self, mask):
         """
@@ -378,102 +449,28 @@ class SAM2ImageMaskModel:
         )
         return sampled_points
 
-    def _set_image_for_predictor(self, rgb):
+    def _predict_mask(self, rgb, points, bbox, labels):
         """
-        Preprocesses the RGB image and sets it for the SAM predictor.
+        Use sampled points to prompt SAM for mask prediction and return mask and score.
         """
-        # # Convert to RGB format (OpenCV loads images in BGR by default)
-        # rgb = cv2.cvtColor(rgb, cv2.COLOR_BGR2RGB)
 
-        # Set the image for the SAM predictor
         self.predictor.set_image(rgb)
 
-    def _predict_mask_with_points(self, rgb, points):
-        """
-        Use sampled points to prompt SAM for mask prediction and return mask and score.
-        """
-        labels = np.ones(
-            len(points), dtype=np.int32
-        )  # All positive labels (foreground)
-
-        # Set the current RGB image for the predictor
-        self._set_image_for_predictor(rgb)
-
-        # Perform mask prediction using the points and labels
-        masks, scores, _ = self.predictor.predict(
-            point_coords=points, point_labels=labels, multimask_output=False
-        )
-
-        # Convert mask to bool type if it's not already
-        if masks.dtype != bool:
-            masks = masks.astype(bool)
-
-        return masks, scores
-
-    def _predict_mask_with_points_and_bbox(self, rgb, points, bbox):
-        """
-        Use sampled points to prompt SAM for mask prediction and return mask and score.
-        """
-        labels = np.ones(
-            len(points), dtype=np.int32
-        )  # All positive labels (foreground)
-
-        # Set the current RGB image for the predictor
-        self._set_image_for_predictor(rgb)
+        if bbox is not None:
+            bbox = bbox[None, :]
 
         # Perform mask prediction using the points and labels
         masks, scores, _ = self.predictor.predict(
             point_coords=points,
             point_labels=labels,
-            box=bbox[None, :],
+            box=bbox,
             multimask_output=False,
         )
 
-        # Convert mask to bool type if it's not already
         if masks.dtype != bool:
             masks = masks.astype(bool)
 
         return masks, scores
-
-    def ransac_mask_selection(self):
-        """
-        Perform RANSAC-like sampling of points and select the best mask based on SAM score.
-        """
-        for idx, (rgb, mask) in enumerate(zip(self.rgb, self.mask)):
-            best_score = -float("inf")
-            best_mask = None
-
-            for _ in range(self.ransac_iterations):
-                try:
-                    # Sample points from the mask
-                    sampled_points = self._sample_points_from_mask(mask)
-                    bbox = self._get_bounding_box_from_mask(mask)
-
-                    # Get mask prediction and score from SAM
-                    # predicted_mask, predicted_scores = self._predict_mask_with_points(rgb, sampled_points)
-                    predicted_mask, predicted_scores = (
-                        self._predict_mask_with_points_and_bbox(
-                            rgb, sampled_points, bbox
-                        )
-                    )
-
-                    predicted_mask = predicted_mask[
-                        0
-                    ]  # Assuming single mask is returned
-
-                    # Choose the mask with the highest score
-                    score = predicted_scores[0]  # Assuming single mask is returned
-                    # score = self._mask_score_calculation(idx, predicted_mask, predicted_scores[0])
-                    if score > best_score:
-                        best_score = score
-                        best_mask = predicted_mask
-                except ValueError as e:
-                    logging.warning(f"Skipping frame {idx} due to error: {e}")
-                    continue
-
-            # Store the best mask and score for the current frame
-            self.masks_refined.append(best_mask)
-            self.sam_scores.append(best_score)
 
     def _get_bounding_box_from_mask(self, mask):
         """
@@ -494,35 +491,3 @@ class SAM2ImageMaskModel:
         y_max = np.max(rows)
 
         return np.array([x_min, y_min, x_max, y_max])
-
-    def _mask_score_calculation(self, idx, refined_mask, sam_score):
-        current_mask = self.mask[idx]
-
-        current_area = np.sum(current_mask)
-        refined_area = np.sum(refined_mask)
-        areas_diff = abs(current_area - refined_area)
-
-        areas_score = 1 / (1 + areas_diff)
-
-        final_score = areas_score * sam_score
-        return final_score
-
-    def refine_masks(self):
-        """
-        Public method to trigger RANSAC-based mask refinement.
-        """
-        self.ransac_mask_selection()
-
-    def cleanup(self):
-        """
-        Cleans up the stored data, including RGBs, masks, and scores,
-        while keeping the SAM model ready for further use.
-        """
-        # Clear all stored data (RGBs, masks, scores)
-        self.rgbs = []
-        self.masks = []
-        self.masks_refined = []
-        self.crop_scores = []
-        self.sam_scores = []
-
-        logging.info("Cleared all stored images, masks, scores, and refined masks.")
