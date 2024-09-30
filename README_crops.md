@@ -75,7 +75,6 @@ python3 -m common.interactive_editor_image common/configs/render.yml
   > Note: Reset mode does not clear the mask currently being displayed, but you can proceed with adding points from scratch.
 - **`enter`**: Save the refined mask for the current object and exit the editor.
 - **`n`**: Save the refined mask and proceed to the next object.
-	- When proceeding to the next object, the editor will automatically switch to reset mode.
 
 ### Additional Information
 
