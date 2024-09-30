@@ -2,6 +2,7 @@ munch
 tqdm
 pyyaml
 numpy
+natsort
 imageio
 lz4
 opencv-python
