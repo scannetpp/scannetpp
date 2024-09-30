@@ -2,6 +2,7 @@
 
 ## Setup
 Follow the main README for installation. Also install [renderpy](https://github.com/liu115/renderpy).
+Install [SAM2](https://github.com/facebookresearch/segment-anything-2/tree/main) to refine masks. 
 
 ## Usage
 Make sure to extract the RGB frames for your scenes. Update the config in `iphone/configs/prepare_iphone_data.yml`.
@@ -35,8 +36,13 @@ scene_ids: [c0f5742640]
 near: 0.05
 far: 20.0
 
-# This needs to be set
+# Output directory for the rendered depth images. If not given, the output will be saved to data folder in data_root
 output_dir: /data/concept-graphs/scannetpp/data
+
+# SAM2 checkpoints directory and config
+sam2_checkpoint_dir: "/path/to/checkpoints/sam2.1_hiera_large.pt"
+sam2_model_cfg: "configs/sam2.1/sam2.1_hiera_l.yaml"
 ```
 
 Crops are saved at `output_dir/scene_id/iphone/render_crops`.
+Refined crops after running SAM2 are saved at `output_dir/scene_id/iphone/render_crops_sam2`.
