@@ -41,8 +41,8 @@ far: 20.0
 output_dir: /data/concept-graphs/scannetpp/data
 
 # SAM2 checkpoints directory and config
-sam2_checkpoint_dir: "/path/to/checkpoints/sam2.1_hiera_large.pt"
-sam2_model_cfg: "configs/sam2.1/sam2.1_hiera_l.yaml"
+sam2_checkpoint_dir: /path/to/checkpoints/sam2.1_hiera_large.pt
+sam2_model_cfg: configs/sam2.1/sam2.1_hiera_l.yaml
 ```
 
 Crops are saved at `output_dir/scene_id/iphone/render_crops`.   
