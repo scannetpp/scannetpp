@@ -392,7 +392,7 @@ class SAM2ImageMaskModel:
         self.scores = sam_scores
         return masks_refined, sam_scores
 
-    def refine_mask_w_point_prompt(self, frame_idx, points, labels):
+    def refine_mask_w_points_prompt(self, points, labels, frame_idx):
         """
         Refine the mask for the provided frame index.
         """
@@ -406,7 +406,7 @@ class SAM2ImageMaskModel:
 
         predicted_mask, predicted_scores = self._predict_mask(rgb, points, bbox, labels)
 
-        self.masks_refined[frame_idx] = predicted_mask[0]
+        self.masks[frame_idx] = predicted_mask[0]
         self.scores[frame_idx] = predicted_scores[0]
 
         return predicted_mask[0], predicted_scores[0]

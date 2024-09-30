@@ -10,7 +10,7 @@ import numpy as np
 
 from utils.utils import load_yaml_munch, read_txt_list
 from render_crops_utils import plot_grid_images
-from sam2_models import SAM2VideoMaskModel
+from sam2_models import SAM2ImageMaskModel
 
 # Global variables for the modes and points
 current_mode = "r"  # 'a' for addition, 'x' for subtraction, 'r' for reset/no mode
@@ -105,7 +105,17 @@ def save_render_plot(crops_data, save_dir, obj_id):
     plt.close()
 
 
-def get_required_obj_id(obj_ids):
+def save_all(sam2_image_model, current_obj_id, data_save_dir, plot_save_dir):
+    """Save all masks and plots for the current object."""
+    global crops_data
+
+    crops_data[current_obj_id]["masks"] = sam2_image_model.masks
+
+    save_masks_data_only(crops_data, data_save_dir, obj_id=current_obj_id)
+    save_render_plot(crops_data, plot_save_dir, current_obj_id)
+
+
+def get_required_ids(obj_ids, frame_ids):
     print(f"Available object IDs: {', '.join(map(str, obj_ids))}")
 
     while True:
@@ -118,28 +128,32 @@ def get_required_obj_id(obj_ids):
         required_obj_id = int(required_obj_id)
 
         if required_obj_id in obj_ids:
-            return required_obj_id
+            break
         else:
             print(
                 f"Invalid object ID. Please select a valid ID from: {', '.join(map(str, obj_ids))}"
             )
 
+    print(f"Available frame IDs: {', '.join(map(str, frame_ids))}")
 
-def save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir):
-    """Save all masks and plots for the current object."""
-    global crops_data
+    while True:
+        required_frame_id = input("Enter the required frame ID (number): ").strip()
 
-    if sam2_video_model.refined_flag:
-        refined_masks = sam2_video_model.propagate_prompt()
-        sam2_video_model.masks = refined_masks
+        if not required_frame_id.isdigit():
+            print("Invalid input. Please enter a valid number.")
+            continue
 
-    crops_data[current_obj_id]["masks"] = sam2_video_model.masks
+        required_frame_id = int(required_frame_id)
 
-    save_masks_data_only(crops_data, data_save_dir, obj_id=current_obj_id)
-    save_render_plot(crops_data, plot_save_dir, current_obj_id)
+        if required_frame_id in frame_ids:
+            return required_obj_id, required_frame_id
+        else:
+            print(
+                f"Invalid frame ID. Please select a valid ID from: {', '.join(map(str, frame_ids))}"
+            )
 
 
-def reset_state(sam2_video_model):
+def reset_state():
     """Reset mode, points, and labels."""
 
     global current_mode, current_points, current_labels
@@ -147,57 +161,40 @@ def reset_state(sam2_video_model):
     current_points = []
     current_labels = []
 
-    sam2_video_model.reset_inference_state()
 
-
-def load_next_object(obj_ids, next_idx, sam2_video_model, data_save_dir, plot_save_dir):
+def load_next_object(
+    obj_ids, next_idx, frame_idx, sam2_image_model, data_save_dir, plot_save_dir
+):
     """Load the next object and start interactive editor."""
 
     interactive_mask_editor(
-        sam2_video_model=sam2_video_model,
+        sam2_image_model=sam2_image_model,
         obj_ids=obj_ids,
         current_idx=next_idx,
         data_save_dir=data_save_dir,
         plot_save_dir=plot_save_dir,
+        frame_idx=frame_idx,
     )
 
 
-def proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx):
+def proceed(sam2_image_model, data_save_dir, plot_save_dir, obj_ids, current_idx):
     """Move to the next object."""
-    reset_state(sam2_video_model)
-    sam2_video_model.cleanup()
+    reset_state()
+    sam2_image_model.cleanup()
 
-    # Load the next object, if available
-    next_idx = current_idx + 1
-    if next_idx < len(obj_ids):
-        plt.close()
-        load_next_object(
-            obj_ids,
-            next_idx,
-            sam2_video_model,
-            data_save_dir,
-            plot_save_dir,
-        )
-    else:
-        print("All objects have been processed.")
-        plt.close()
+    frame_ids = list(range(0, 4))  # Assuming 4 frames per object
+    required_obj_id, frame_idx = get_required_ids(obj_ids, frame_ids)
 
-
-def find_and_proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids):
-    """Move to the next object."""
-    reset_state(sam2_video_model)
-    sam2_video_model.cleanup()
-
-    required_obj_id = get_required_obj_id(obj_ids)
-
-    # Load the next object, if available
+    # Load the next required object
     next_idx = obj_ids.index(required_obj_id)
+
     if next_idx < len(obj_ids):
         plt.close()
         load_next_object(
             obj_ids,
             next_idx,
-            sam2_video_model,
+            frame_idx,
+            sam2_image_model,
             data_save_dir,
             plot_save_dir,
         )
@@ -206,7 +203,7 @@ def find_and_proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids):
         plt.close()
 
 
-def on_click(event, sam2_video_model, mask_overlay, frame_idx):
+def on_click(event, sam2_image_model, mask_overlay, frame_idx):
     global current_points, current_labels
 
     if (
@@ -221,7 +218,7 @@ def on_click(event, sam2_video_model, mask_overlay, frame_idx):
 
         # Update mask with the new points
         points, labels = np.array(current_points), np.array(current_labels)
-        refined_mask = sam2_video_model.refine_mask_w_points_prompt(
+        refined_mask, _ = sam2_image_model.refine_mask_w_points_prompt(
             points, labels, frame_idx
         )
 
@@ -239,7 +236,7 @@ def on_click(event, sam2_video_model, mask_overlay, frame_idx):
         )
 
 
-def on_key(event, sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx):
+def on_key(event, sam2_image_model, data_save_dir, plot_save_dir, obj_ids, current_idx):
     global current_mode, current_points, current_labels, current_obj_id
 
     # Switch modes or handle events based on key presses
@@ -252,20 +249,16 @@ def on_key(event, sam2_video_model, data_save_dir, plot_save_dir, obj_ids, curre
         print("Switched to subtraction mode")
 
     elif event.key == "r":
-        reset_state(sam2_video_model)
+        reset_state()
         print("Reset to no mode and cleared points/labels")
 
     elif event.key == "enter":
-        save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir)
+        save_all(sam2_image_model, current_obj_id, data_save_dir, plot_save_dir)
         plt.close()  # Exit editor on pressing 'enter'
 
     elif event.key == "n":
-        save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir)
-        proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx)
-
-    elif event.key == "m":
-        save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir)
-        find_and_proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids)
+        save_all(sam2_image_model, current_obj_id, data_save_dir, plot_save_dir)
+        proceed(sam2_image_model, data_save_dir, plot_save_dir, obj_ids, current_idx)
 
 
 def get_data_from_crops(crops_data, obj_id):
@@ -278,7 +271,7 @@ def get_data_from_crops(crops_data, obj_id):
 
 
 def interactive_mask_editor(
-    sam2_video_model,
+    sam2_image_model,
     obj_ids,
     current_idx,
     data_save_dir,
@@ -304,17 +297,17 @@ def interactive_mask_editor(
     ax2.axis("off")
 
     # Initialize the SAM2 model with the provided RGBs and masks
-    sam2_video_model.store_data(rgbs, masks, scores)
+    sam2_image_model.store_data(rgbs, masks, scores)
 
     # Connect events to handlers
     fig.canvas.mpl_connect(
         "button_press_event",
-        lambda event: on_click(event, sam2_video_model, mask_overlay, frame_idx),
+        lambda event: on_click(event, sam2_image_model, mask_overlay, frame_idx),
     )
     fig.canvas.mpl_connect(
         "key_press_event",
         lambda event: on_key(
-            event, sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx
+            event, sam2_image_model, data_save_dir, plot_save_dir, obj_ids, current_idx
         ),
     )
 
@@ -359,23 +352,26 @@ def main(args):
     crops_data_dir = output_dir / scene_id / device / "crops_data"
     crops_data = load_crops_data(crops_data_dir)
     obj_ids = list(crops_data.keys())
+    frame_ids = list(range(0, 4))  # Assuming 4 frames per object
 
-    required_obj_id = get_required_obj_id(obj_ids)
+    required_obj_id, required_frame_id = get_required_ids(obj_ids, frame_ids)
 
     # Initialize the SAM2 video model with checkpoint and configuration
     sam2_checkpoint = "/home/kumaraditya/checkpoints/sam2_hiera_large.pt"
     sam2_model_cfg = "sam2_hiera_l.yaml"
-    sam2_video_model = SAM2VideoMaskModel(sam2_checkpoint, sam2_model_cfg)
+    sam2_image_model = SAM2ImageMaskModel(sam2_checkpoint, sam2_model_cfg)
 
     # Directory to save rendered crops
     plot_save_dir = crops_data_dir.parent / "render_crops_manual"
 
     # Start the interactive mask editor with the first object
     starting_idx = obj_ids.index(required_obj_id)
+    frame_idx = required_frame_id
     interactive_mask_editor(
-        sam2_video_model=sam2_video_model,
+        sam2_image_model=sam2_image_model,
         obj_ids=obj_ids,
         current_idx=starting_idx,
+        frame_idx=frame_idx,
         data_save_dir=crops_data_dir,
         plot_save_dir=plot_save_dir,
     )
