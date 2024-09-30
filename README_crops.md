@@ -1,8 +1,8 @@
 # Object Crops
 
 ## Setup
-Follow the main README for installation. Also install [renderpy](https://github.com/liu115/renderpy).
-Install [SAM2](https://github.com/facebookresearch/segment-anything-2/tree/main) to refine masks. 
+Follow the main README for installation. Also install [renderpy](https://github.com/liu115/renderpy).   
+Install [SAM2](https://github.com/facebookresearch/segment-anything-2/tree/main) to refine masks.
 
 ## Usage
 Make sure to extract the RGB frames for your scenes. Update the config in `iphone/configs/prepare_iphone_data.yml`.
@@ -44,5 +44,5 @@ sam2_checkpoint_dir: "/path/to/checkpoints/sam2.1_hiera_large.pt"
 sam2_model_cfg: "configs/sam2.1/sam2.1_hiera_l.yaml"
 ```
 
-Crops are saved at `output_dir/scene_id/iphone/render_crops`.
+Crops are saved at `output_dir/scene_id/iphone/render_crops`.   
 Refined crops after running SAM2 are saved at `output_dir/scene_id/iphone/render_crops_sam2`.
