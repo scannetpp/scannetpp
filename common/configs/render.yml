@@ -17,3 +17,7 @@ far: 20.0
 
 # Output directory for the rendered depth images. If not given, the output will be saved to data folder in data_root
 output_dir: /data/concept-graphs/scannetpp/data
+
+# SAM2 checkpoints directory and config
+sam2_checkpoint_dir: /path/to/checkpoints/sam2.1_hiera_large.pt
+sam2_model_cfg: configs/sam2.1/sam2.1_hiera_l.yaml

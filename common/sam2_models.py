@@ -4,19 +4,17 @@ import tempfile
 import shutil
 import cv2
 import numpy as np
-import logging
+import sys
+
+# import logging
 import random
 
-from sam2.build_sam import build_sam2, build_sam2_video_predictor
-from sam2.sam2_image_predictor import SAM2ImagePredictor
-
-# Set up logging
-logging.basicConfig(
-    level=logging.INFO,  # Logging level
-    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    filename="sam2_model.log",  # Log file path
-    filemode="w",  # 'w' to overwrite the log file each time, 'a' to append
-)
+try:
+    from sam2.build_sam import build_sam2, build_sam2_video_predictor
+    from sam2.sam2_image_predictor import SAM2ImagePredictor
+except ImportError:
+    print("SAM2 not installed. Please install SAM2 to refine masks")
+    sys.exit(1)
 
 
 class SAM2VideoMaskModel:
@@ -46,7 +44,7 @@ class SAM2VideoMaskModel:
             self.temp_dir = tempfile.mkdtemp()
         else:
             self.temp_dir = temp_dir
-        logging.info(f"Temporary directory created at: {self.temp_dir}")
+        # logging.info(f"Temporary directory created at: {self.temp_dir}")
 
         self.num_points = num_points
         self.predictor_inference_state = None
@@ -203,9 +201,9 @@ class SAM2VideoMaskModel:
             unpadded_refined_mask = self._unpad_mask(refined_mask, out_frame_idx)
 
             if np.sum(refined_mask) == 0:
-                logging.warning(
-                    f"Refined mask is empty for frame {out_frame_idx}. Using the old mask."
-                )
+                # logging.warning(
+                #     f"Refined mask is empty for frame {out_frame_idx}. Using the old mask."
+                # )
                 refined_mask = self.masks_padded[out_frame_idx]
 
             refined_masks.append(unpadded_refined_mask)
@@ -272,9 +270,12 @@ class SAM2VideoMaskModel:
         highest_score_mask = self.masks_padded[highest_score_idx]
 
         if highest_score_idx != 0:
-            logging.info(
-                f"Using mask with the highest score from frame {highest_score_idx} as the initial prompt."
+            print(
+                "Using mask with the highest score from frame {highest_score_idx} as the initial prompt."
             )
+            # logging.info(
+            #     f"Using mask with the highest score from frame {highest_score_idx} as the initial prompt."
+            # )
 
         if points:
             mask_indices = np.argwhere(highest_score_mask > 0)
@@ -321,9 +322,10 @@ class SAM2VideoMaskModel:
                     elif os.path.isdir(file_path):
                         shutil.rmtree(file_path)  # Remove subdirectory and its contents
                 except Exception as e:
-                    logging.error(f"Failed to delete {file_path}. Reason: {e}")
+                    print(f"Failed to delete {file_path}. Reason: {e}")
+                    # logging.error(f"Failed to delete {file_path}. Reason: {e}")
 
-            logging.info(f"Contents of temporary directory {self.temp_dir} removed.")
+            # logging.info(f"Contents of temporary directory {self.temp_dir} removed.")
 
     def _clear_storage(self):
         """
@@ -335,9 +337,9 @@ class SAM2VideoMaskModel:
         self.masks_padded = []
         self.scores = []
         self.padding_info = []
-        logging.info(
-            "Cleared all stored images, masks, scores, and padding information."
-        )
+        # logging.info(
+        #     "Cleared all stored images, masks, scores, and padding information."
+        # )
 
 
 class SAM2ImageMaskModel:
@@ -421,7 +423,7 @@ class SAM2ImageMaskModel:
         self.masks = []
         self.scores = []
 
-        logging.info("Cleared all stored images, masks, scores, and refined masks.")
+        # logging.info("Cleared all stored images, masks, scores, and refined masks.")
 
     def _ransac_mask_selection(self):
         """
@@ -454,7 +456,7 @@ class SAM2ImageMaskModel:
                         best_mask = predicted_mask
 
                 except ValueError as e:
-                    logging.warning(f"Skipping frame {idx} due to error: {e}")
+                    # logging.warning(f"Skipping frame {idx} due to error: {e}")
                     continue
 
             # Store the best mask and score for the current frame

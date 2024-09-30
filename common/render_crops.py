@@ -9,6 +9,7 @@ import imageio
 import numpy as np
 from tqdm import tqdm
 
+
 try:
     import renderpy
 except ImportError:
@@ -20,13 +21,39 @@ except ImportError:
 from common.utils.colmap import read_model, write_model, Image
 from common.scene_release import ScannetppScene_Release
 from common.utils.utils import run_command, load_yaml_munch, load_json, read_txt_list
+from common.sam2_models import SAM2VideoMaskModel, SAM2ImageMaskModel
 
 from common.render_crops_utils import (
     vert_to_obj_lookup,
     CropHeap,
     crop_rgb_mask,
     plot_grid_images,
+    save_crops_data,
 )
+
+
+def sam2_refine_masks(sam2_video_model, sam2_img_model, rgbs, masks, scores):
+    sam2_img_model.store_data(rgbs, masks, scores)
+    img_refined_masks, img_refined_scores = sam2_img_model.refine_masks()
+    sam2_img_model.cleanup()
+
+    sorted_data = sorted(
+        zip(img_refined_scores, rgbs, img_refined_masks),
+        key=lambda x: x[0],
+        reverse=True,
+    )
+    img_refined_scores, rgbs, img_refined_masks = zip(*sorted_data)
+
+    # Convert them back to lists
+    img_refined_scores = list(img_refined_scores)
+    rgbs = list(rgbs)
+    img_refined_masks = list(img_refined_masks)
+
+    sam2_video_model.store_data(rgbs, img_refined_masks, img_refined_scores)
+    video_refined_masks = sam2_video_model.refine_masks_and_propagate(mode="mask")
+    sam2_video_model.cleanup()
+
+    return rgbs, video_refined_masks, img_refined_scores
 
 
 def main(args):
@@ -46,6 +73,7 @@ def main(args):
         # default to data folder in data_root
         output_dir = Path(cfg.data_root) / "data"
     output_dir = Path(output_dir)
+    temp_dir = output_dir / "temp"
 
     render_devices = []
     if cfg.get("render_dslr", False):
@@ -53,6 +81,20 @@ def main(args):
         raise Exception("This code is has not been tested with the DSLR data.")
     if cfg.get("render_iphone", False):
         render_devices.append("iphone")
+
+    refined_crops_data = dict()
+
+    sam2_checkpoint = cfg.get("sam2_checkpoint_dir", None)
+    sam2_model_cfg = cfg.get("sam2_model_cfg", None)
+    if sam2_checkpoint is None or sam2_model_cfg is None:
+        raise Exception("Please provide sam2_checkpoint_dir and sam2_model_cfg")
+
+    sam2_video_model = SAM2VideoMaskModel(
+        sam2_checkpoint, sam2_model_cfg, temp_dir=temp_dir
+    )
+    sam2_image_model = SAM2ImageMaskModel(
+        sam2_checkpoint, sam2_model_cfg, num_points=3, ransac_iterations=5
+    )
 
     # go through each scene
     for scene_id in tqdm(scene_ids, desc="scene"):
@@ -106,13 +148,20 @@ def main(args):
 
             near = cfg.get("near", 0.05)
             far = cfg.get("far", 20.0)
-            rgb_dir = Path(cfg.output_dir) / scene_id / device / "render_rgb"
-            rgb_dir = Path(cfg.output_dir) / scene_id / device / "render_rgb"
-            depth_dir = Path(cfg.output_dir) / scene_id / device / "render_depth"
-            crop_dir = Path(cfg.output_dir) / scene_id / device / "render_crops"
+
+            save_dir = Path(cfg.output_dir) / scene_id / device
+            rgb_dir = save_dir / "render_rgb"
+            depth_dir = save_dir / "render_depth"
+            crop_dir = save_dir / "render_crops"
+            crop_sam2_dir = save_dir / "render_crops_sam2"
+            crop_data_dir = save_dir / "crops_data"
+
             rgb_dir.mkdir(parents=True, exist_ok=True)
             depth_dir.mkdir(parents=True, exist_ok=True)
             crop_dir.mkdir(parents=True, exist_ok=True)
+            crop_sam2_dir.mkdir(parents=True, exist_ok=True)
+            crop_data_dir.mkdir(parents=True, exist_ok=True)
+            temp_dir.mkdir(parents=True, exist_ok=True)
 
             for _, image in tqdm(
                 images.items(), f"Rendering object crops using {device} images"
@@ -160,11 +209,29 @@ def main(args):
                 crops = heap.get_sorted()
                 rgbs = [c.rgb for c in crops]
                 masks = [c.mask for c in crops]
-                plot_grid_images(
-                    rgbs + masks, grid_width=len(rgbs), title=entry["label"]
+                scores = [c.score for c in crops]
+
+                rgbs_sorted, refined_masks, refined_scores = sam2_refine_masks(
+                    sam2_video_model, sam2_image_model, rgbs, masks, scores
                 )
+
+                refined_crops_data[id] = dict()
+                refined_crops_data[id]["rgbs"] = rgbs_sorted
+                refined_crops_data[id]["masks"] = refined_masks
+                refined_crops_data[id]["scores"] = refined_scores
+                refined_crops_data[id]["label"] = label
+
+                plot_grid_images(rgbs, masks, grid_width=len(rgbs), title=label)
                 plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
                 plt.close()
+
+                plot_grid_images(
+                    rgbs_sorted, refined_masks, grid_width=len(rgbs_sorted), title=label
+                )
+                plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
+                plt.close()
+
+        save_crops_data(refined_crops_data, crop_data_dir, pad_length=5)
 
 
 if __name__ == "__main__":

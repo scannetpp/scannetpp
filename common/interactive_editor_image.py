@@ -8,9 +8,9 @@ import cv2
 
 import numpy as np
 
-from utils.utils import load_yaml_munch, read_txt_list
-from render_crops_utils import plot_grid_images
-from sam2_models import SAM2ImageMaskModel
+from common.utils.utils import load_yaml_munch, read_txt_list
+from common.render_crops_utils import plot_grid_images
+from common.sam2_models import SAM2ImageMaskModel
 
 # Global variables for the modes and points
 current_mode = "r"  # 'a' for addition, 'x' for subtraction, 'r' for reset/no mode
@@ -357,9 +357,14 @@ def main(args):
     required_obj_id, required_frame_id = get_required_ids(obj_ids, frame_ids)
 
     # Initialize the SAM2 video model with checkpoint and configuration
-    sam2_checkpoint = "/home/kumaraditya/checkpoints/sam2_hiera_large.pt"
-    sam2_model_cfg = "sam2_hiera_l.yaml"
-    sam2_image_model = SAM2ImageMaskModel(sam2_checkpoint, sam2_model_cfg)
+    sam2_checkpoint = cfg.get("sam2_checkpoint_dir", None)
+    sam2_model_cfg = cfg.get("sam2_model_cfg", None)
+    if sam2_checkpoint is None or sam2_model_cfg is None:
+        raise Exception("Please provide sam2_checkpoint_dir and sam2_model_cfg")
+
+    sam2_image_model = SAM2ImageMaskModel(
+        sam2_checkpoint, sam2_model_cfg, num_points=3, ransac_iterations=5
+    )
 
     # Directory to save rendered crops
     plot_save_dir = crops_data_dir.parent / "render_crops_manual"
@@ -380,13 +385,8 @@ def main(args):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(
-        "config_file",
-        help="Path to config file",
-        default="/home/kumaraditya/scannetpp/common/configs/render.yml",
-        nargs="?",
+        "config_file", help="Path to config file", default="configs/render_crops.yaml"
     )
-    args = p.parse_args([])
-
-    print(f"Config file: {args.config_file}")
+    args = p.parse_args()
 
     main(args)

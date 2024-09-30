@@ -8,9 +8,9 @@ import cv2
 
 import numpy as np
 
-from utils.utils import load_yaml_munch, read_txt_list
-from render_crops_utils import plot_grid_images
-from sam2_models import SAM2VideoMaskModel
+from common.utils.utils import load_yaml_munch, read_txt_list
+from common.render_crops_utils import plot_grid_images
+from common.sam2_models import SAM2VideoMaskModel
 
 # Global variables for the modes and points
 current_mode = "r"  # 'a' for addition, 'x' for subtraction, 'r' for reset/no mode
@@ -183,29 +183,6 @@ def proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx
         plt.close()
 
 
-def find_and_proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids):
-    """Move to the next object."""
-    reset_state(sam2_video_model)
-    sam2_video_model.cleanup()
-
-    required_obj_id = get_required_obj_id(obj_ids)
-
-    # Load the next object, if available
-    next_idx = obj_ids.index(required_obj_id)
-    if next_idx < len(obj_ids):
-        plt.close()
-        load_next_object(
-            obj_ids,
-            next_idx,
-            sam2_video_model,
-            data_save_dir,
-            plot_save_dir,
-        )
-    else:
-        print("All objects have been processed.")
-        plt.close()
-
-
 def on_click(event, sam2_video_model, mask_overlay, frame_idx):
     global current_points, current_labels
 
@@ -262,10 +239,6 @@ def on_key(event, sam2_video_model, data_save_dir, plot_save_dir, obj_ids, curre
     elif event.key == "n":
         save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir)
         proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids, current_idx)
-
-    elif event.key == "m":
-        save_all(sam2_video_model, current_obj_id, data_save_dir, plot_save_dir)
-        find_and_proceed(sam2_video_model, data_save_dir, plot_save_dir, obj_ids)
 
 
 def get_data_from_crops(crops_data, obj_id):
@@ -363,8 +336,11 @@ def main(args):
     required_obj_id = get_required_obj_id(obj_ids)
 
     # Initialize the SAM2 video model with checkpoint and configuration
-    sam2_checkpoint = "/home/kumaraditya/checkpoints/sam2_hiera_large.pt"
-    sam2_model_cfg = "sam2_hiera_l.yaml"
+    sam2_checkpoint = cfg.get("sam2_checkpoint_dir", None)
+    sam2_model_cfg = cfg.get("sam2_model_cfg", None)
+    if sam2_checkpoint is None or sam2_model_cfg is None:
+        raise Exception("Please provide sam2_checkpoint_dir and sam2_model_cfg")
+
     sam2_video_model = SAM2VideoMaskModel(sam2_checkpoint, sam2_model_cfg)
 
     # Directory to save rendered crops
@@ -384,13 +360,8 @@ def main(args):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(
-        "config_file",
-        help="Path to config file",
-        default="/home/kumaraditya/scannetpp/common/configs/render.yml",
-        nargs="?",
+        "config_file", help="Path to config file", default="configs/render_crops.yaml"
     )
-    args = p.parse_args([])
-
-    print(f"Config file: {args.config_file}")
+    args = p.parse_args()
 
     main(args)

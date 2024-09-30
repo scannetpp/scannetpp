@@ -2,6 +2,8 @@ from typing import List, Union
 import matplotlib.pyplot as plt
 import heapq
 import numpy as np
+import os
+import json
 import cv2
 
 
@@ -108,43 +110,7 @@ def mask_to_bbox(mask, inflate_px=0):
     return (min_row, max_row, min_col, max_col), touches_border
 
 
-def compute_optical_flow_score(rgb, rgb_rendered) -> float:
-    """
-    Computes a score based on optical flow magnitude between two images.
-
-    Parameters:
-    - rgb: Original RGB image (numpy array).
-    - rgb_rendered: Rendered RGB image (numpy array).
-
-    Returns:
-    - score: A float score where lower optical flow magnitudes yield higher scores.
-    """
-
-    # Convert the images to grayscale
-    gray_rgb = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
-    gray_rgb_rendered = cv2.cvtColor(rgb_rendered, cv2.COLOR_RGB2GRAY)
-
-    # scale down by 3 for faster computation
-    gray_rgb = cv2.resize(gray_rgb, None, fx=1 / 4, fy=1 / 4)
-    gray_rgb_rendered = cv2.resize(gray_rgb_rendered, None, fx=1 / 4, fy=1 / 4)
-
-    # Compute the optical flow between the two grayscale images
-    flow = cv2.calcOpticalFlowFarneback(
-        gray_rgb, gray_rgb_rendered, None, 0.5, 2, 15, 3, 5, 1.2, 0
-    )
-
-    # Compute the magnitude of the optical flow vectors
-    magnitude, _ = cv2.cartToPolar(flow[..., 0], flow[..., 1])
-    avg_mismatch = np.mean(magnitude)
-    score = 1 / (avg_mismatch + 1e-6)  # Add small value to avoid division by zero
-
-    return score
-
-
-def crop_rgb_mask(rgb, rgb_rendered, mask, inflate_px=0, border_penalty_factor=0.1):
-    # optical_flow_score = compute_optical_flow_score(rgb, rgb_rendered)
-    # optical_flow_score = 1.0
-
+def crop_rgb_mask(rgb, mask, inflate_px=0, border_penalty_factor=0.1):
     (x_min, x_max, y_min, y_max), touches_border = mask_to_bbox(
         mask, inflate_px=inflate_px
     )
@@ -201,3 +167,34 @@ def plot_grid_images(
     plt.tight_layout()
     plt.suptitle(title, fontsize=30)
     plt.subplots_adjust(top=0.90)
+
+
+def save_crops_data(crops_data, output_dir, pad_length=5):
+    rgb_dir = output_dir / "rgbs"
+    mask_dir = output_dir / "masks"
+    metadata_dir = output_dir / "metadata"
+
+    os.makedirs(rgb_dir, exist_ok=True)
+    os.makedirs(mask_dir, exist_ok=True)
+    os.makedirs(metadata_dir, exist_ok=True)
+
+    for obj_id, data in crops_data.items():
+        padded_obj_id = str(obj_id).zfill(pad_length)
+
+        for crop_id, (rgb, mask) in enumerate(zip(data["rgbs"], data["masks"])):
+            rgb_filename = os.path.join(rgb_dir, f"{padded_obj_id}_{crop_id}_rgb.png")
+            cv2.imwrite(
+                rgb_filename, cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR)
+            )  # Convert to BGR before saving
+
+            mask_filename = os.path.join(
+                mask_dir, f"{padded_obj_id}_{crop_id}_mask.npy"
+            )
+            np.save(mask_filename, mask)
+
+        scores = [round(float(score), 4) for score in data["scores"]]
+
+        metadata = {"scores": scores, "label": data["label"]}
+        metadata_filename = os.path.join(metadata_dir, f"{padded_obj_id}_metadata.json")
+        with open(metadata_filename, "w") as metadata_file:
+            json.dump(metadata, metadata_file, indent=4)
