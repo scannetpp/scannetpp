@@ -1,6 +1,7 @@
 # Object Crops
 
 ## Setup
+First install PyTorch corresponding to your local cuda-toolkit version from [here](https://pytorch.org/get-started/locally/).   
 Follow the main README for installation. Also install [renderpy](https://github.com/liu115/renderpy).   
 Install [SAM2](https://github.com/facebookresearch/segment-anything-2/tree/main) to refine masks.
 
