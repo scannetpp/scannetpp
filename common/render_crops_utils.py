@@ -142,6 +142,10 @@ def plot_grid_images(
         ),
     )
 
+    # If only one column, axs will be 1D; convert it to 2D
+    if grid_width == 1:
+        axs = np.expand_dims(axs, axis=1)
+
     for i in range(grid_width):
         if i >= n_images:
             break  # If fewer images than grid_width, break
@@ -167,6 +171,36 @@ def plot_grid_images(
     plt.tight_layout()
     plt.suptitle(title, fontsize=30)
     plt.subplots_adjust(top=0.90)
+
+
+def plot_2x2_grid_images(
+    images: List[np.ndarray],
+    masks: List[np.ndarray],
+) -> None:
+    # Assuming at least 3 images and masks are provided
+    img1_masked = images[0].copy()
+    img1_masked[masks[0] == 0] = [255, 255, 255]  # Apply mask to create masked image 1
+
+    # Create a 2x2 grid
+    fig, axs = plt.subplots(2, 2, figsize=(10, 10))
+
+    # Top left: img1_masked
+    axs[0, 0].imshow(img1_masked)
+    axs[0, 0].axis("off")
+
+    # Top right: img1
+    axs[0, 1].imshow(images[0])
+    axs[0, 1].axis("off")
+
+    # Bottom left: img2
+    axs[1, 0].imshow(images[1])
+    axs[1, 0].axis("off")
+
+    # Bottom right: img3
+    axs[1, 1].imshow(images[2])
+    axs[1, 1].axis("off")
+
+    plt.tight_layout()
 
 
 def save_crops_data(crops_data, output_dir, pad_length=5):

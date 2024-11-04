@@ -74,6 +74,7 @@ def main(args):
         output_dir = Path(cfg.data_root) / "data"
     output_dir = Path(output_dir)
     temp_dir = output_dir / "temp"
+    temp_dir.mkdir(parents=True, exist_ok=True)
 
     render_devices = []
     if cfg.get("render_dslr", False):
@@ -89,9 +90,7 @@ def main(args):
     if sam2_checkpoint is None or sam2_model_cfg is None:
         raise Exception("Please provide sam2_checkpoint_dir and sam2_model_cfg")
 
-    sam2_video_model = SAM2VideoMaskModel(
-        sam2_checkpoint, sam2_model_cfg, temp_dir=temp_dir
-    )
+    sam2_video_model = SAM2VideoMaskModel(sam2_checkpoint, sam2_model_cfg)
     sam2_image_model = SAM2ImageMaskModel(
         sam2_checkpoint, sam2_model_cfg, num_points=3, ransac_iterations=5
     )
@@ -101,6 +100,7 @@ def main(args):
         scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / "data")
         render_engine = renderpy.Render()
         render_engine.setupMesh(str(scene.scan_mesh_path))
+        refined_crops_data = dict()
 
         # Load annotations
         segments_anno = json.load(open(scene.scan_anno_json_path, "r"))
@@ -161,7 +161,6 @@ def main(args):
             crop_dir.mkdir(parents=True, exist_ok=True)
             crop_sam2_dir.mkdir(parents=True, exist_ok=True)
             crop_data_dir.mkdir(parents=True, exist_ok=True)
-            temp_dir.mkdir(parents=True, exist_ok=True)
 
             for _, image in tqdm(
                 images.items(), f"Rendering object crops using {device} images"
@@ -198,38 +197,65 @@ def main(args):
         for id, entry in tqdm(crop_heaps.items(), f"Rendering image grids"):
             heap = entry["heap"]
             label = entry["label"]
-            if len(heap) and label.lower() not in [
-                "background",
-                "wall",
-                "floor",
-                "ceiling",
-                "split",
-                "remove",
-            ]:
-                crops = heap.get_sorted()
-                rgbs = [c.rgb for c in crops]
-                masks = [c.mask for c in crops]
-                scores = [c.score for c in crops]
+            crops = heap.get_sorted()
+            rgbs = [c.rgb for c in crops]
+            masks = [c.mask for c in crops]
+            scores = [c.score for c in crops]
 
-                rgbs_sorted, refined_masks, refined_scores = sam2_refine_masks(
-                    sam2_video_model, sam2_image_model, rgbs, masks, scores
-                )
+            if len(heap) == 0:
+                continue
 
-                refined_crops_data[id] = dict()
-                refined_crops_data[id]["rgbs"] = rgbs_sorted
-                refined_crops_data[id]["masks"] = refined_masks
-                refined_crops_data[id]["scores"] = refined_scores
-                refined_crops_data[id]["label"] = label
+            rgbs_sorted, refined_masks, refined_scores = sam2_refine_masks(
+                sam2_video_model, sam2_image_model, rgbs, masks, scores
+            )
 
-                plot_grid_images(rgbs, masks, grid_width=len(rgbs), title=label)
-                plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
-                plt.close()
+            refined_crops_data[id] = dict()
+            refined_crops_data[id]["rgbs"] = rgbs_sorted
+            refined_crops_data[id]["masks"] = refined_masks
+            refined_crops_data[id]["scores"] = refined_scores
+            refined_crops_data[id]["label"] = label
 
-                plot_grid_images(
-                    rgbs_sorted, refined_masks, grid_width=len(rgbs_sorted), title=label
-                )
-                plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
-                plt.close()
+            plot_grid_images(rgbs, masks, grid_width=len(rgbs), title=label)
+            plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
+            plt.close()
+
+            plot_grid_images(
+                rgbs_sorted, refined_masks, grid_width=len(rgbs_sorted), title=label
+            )
+            plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
+            plt.close()
+            # if len(heap) and label.lower() not in [
+            #     "background",
+            #     "wall",
+            #     "floor",
+            #     "ceiling",
+            #     "split",
+            #     "remove",
+            # ]:
+            #     crops = heap.get_sorted()
+            #     rgbs = [c.rgb for c in crops]
+            #     masks = [c.mask for c in crops]
+            #     scores = [c.score for c in crops]
+
+            #     rgbs_sorted, refined_masks, refined_scores = sam2_refine_masks(
+            #         sam2_video_model, sam2_image_model, rgbs, masks, scores
+            #     )
+
+            #     refined_crops_data[id] = dict()
+            #     refined_crops_data[id]["rgbs"] = rgbs_sorted
+            #     refined_crops_data[id]["masks"] = refined_masks
+            #     refined_crops_data[id]["scores"] = refined_scores
+            #     refined_crops_data[id]["label"] = label
+
+            #     plot_grid_images(rgbs, masks, grid_width=len(rgbs), title=label)
+            #     plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
+            #     plt.close()
+
+            #     plot_grid_images(
+            #         rgbs_sorted, refined_masks, grid_width=len(rgbs_sorted), title=label
+            #     )
+            #     plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
+            #     plt.close()
 
         save_crops_data(refined_crops_data, crop_data_dir, pad_length=5)
 

@@ -326,6 +326,7 @@ def main(args):
 
     # Assuming one scene ID and one device for simplicity
     scene_id = scene_ids[0]
+    print(scene_id)
     device = render_devices[0]
 
     # Set path for crops data

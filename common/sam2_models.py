@@ -44,6 +44,7 @@ class SAM2VideoMaskModel:
             self.temp_dir = tempfile.mkdtemp()
         else:
             self.temp_dir = temp_dir
+        print(f"Temporary directory created at: {self.temp_dir}")
         # logging.info(f"Temporary directory created at: {self.temp_dir}")
 
         self.num_points = num_points
