@@ -88,7 +88,7 @@ def main(args):
     # Assuming one one device for simplicity
     device = render_devices[0]
 
-    for scene_id in scene_ids:
+    for scene_id in tqdm(scene_ids):
         # Set path for crops data
         crops_data_dir = output_dir / scene_id / device / "crops_data"
         crops_data = load_crops_data(crops_data_dir)

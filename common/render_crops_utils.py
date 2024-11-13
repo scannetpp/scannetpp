@@ -177,6 +177,19 @@ def plot_2x2_grid_images(
     images: List[np.ndarray],
     masks: List[np.ndarray],
 ) -> None:
+
+    # Pad images and masks if fewer than 4 are available
+    while len(images) < 4:
+        max_height = max(img.shape[0] for img in images)
+        max_width = max(img.shape[1] for img in images)
+
+        # Create a blank RGB and mask with white background (255) and all mask values as 1
+        padded_image = np.full((max_height, max_width, 3), 255, dtype=np.uint8)
+        padded_mask = np.ones((max_height, max_width), dtype=np.uint8)
+
+        images.append(padded_image)
+        masks.append(padded_mask)
+
     # Assuming at least 3 images and masks are provided
     img1_masked = images[0].copy()
     img1_masked[masks[0] == 0] = [255, 255, 255]  # Apply mask to create masked image 1

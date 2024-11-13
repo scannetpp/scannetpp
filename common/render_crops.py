@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import imageio
 import numpy as np
 from tqdm import tqdm
+import gc
 
 
 try:
@@ -224,38 +225,6 @@ def main(args):
             )
             plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
             plt.close()
-            # if len(heap) and label.lower() not in [
-            #     "background",
-            #     "wall",
-            #     "floor",
-            #     "ceiling",
-            #     "split",
-            #     "remove",
-            # ]:
-            #     crops = heap.get_sorted()
-            #     rgbs = [c.rgb for c in crops]
-            #     masks = [c.mask for c in crops]
-            #     scores = [c.score for c in crops]
-
-            #     rgbs_sorted, refined_masks, refined_scores = sam2_refine_masks(
-            #         sam2_video_model, sam2_image_model, rgbs, masks, scores
-            #     )
-
-            #     refined_crops_data[id] = dict()
-            #     refined_crops_data[id]["rgbs"] = rgbs_sorted
-            #     refined_crops_data[id]["masks"] = refined_masks
-            #     refined_crops_data[id]["scores"] = refined_scores
-            #     refined_crops_data[id]["label"] = label
-
-            #     plot_grid_images(rgbs, masks, grid_width=len(rgbs), title=label)
-            #     plt.savefig(crop_dir / f"{str(id).zfill(5)}.jpg")
-            #     plt.close()
-
-            #     plot_grid_images(
-            #         rgbs_sorted, refined_masks, grid_width=len(rgbs_sorted), title=label
-            #     )
-            #     plt.savefig(crop_sam2_dir / f"{str(id).zfill(5)}.jpg")
-            #     plt.close()
 
         save_crops_data(refined_crops_data, crop_data_dir, pad_length=5)
 
@@ -263,7 +232,9 @@ def main(args):
 if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument(
-        "config_file", help="Path to config file", default="configs/render_crops.yaml"
+        "--config_file",
+        help="Path to config file",
+        default="configs/render.yml",
     )
     args = p.parse_args()
 
