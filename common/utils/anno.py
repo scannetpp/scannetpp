@@ -16,12 +16,14 @@ from scannetpp.common.utils.rasterize import undistort_rasterization, upsample_r
 def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, undistort_dslr=None, anno=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.pth'
     if cached_path.exists():
+        print(f'Loading visibility data from cache: {cached_path}')
         visiblity_data = torch.load(cached_path)
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
         visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, subsample_factor=subsample_factor, undistort_dslr=undistort_dslr)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
+        print(f'Saving visibility data to cache: {cached_path}')
         torch.save(visiblity_data, cached_path)
 
     return visiblity_data
