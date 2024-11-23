@@ -46,11 +46,11 @@ def load_annotation(anno_path, bboxes_only=False, segments_path=None, return_ver
 
     # json['segGroups'] has id, objectId, segments, label, obb
     if bboxes_only:
-        # everything except segments
+        # everything except segments, gets the 3d bbox
         ret_dict['objects'] = {segGroup['objectId']: {k: v for k, v in segGroup.items() if k != 'segments'} for segGroup in anno['segGroups']}
     else:   
         # everything
-        ret_dict['objects'] = anno['segGroups']
+        ret_dict['objects'] = {segGroup['objectId']: {k: v for k, v in segGroup.items()} for segGroup in anno['segGroups']}
 
     if return_vertex_obj_ids:
         # load the segments json file
