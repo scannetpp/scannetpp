@@ -553,7 +553,7 @@ def get_camera_images_poses(scene, subsample_factor, image_type):
     distort_params = None
 
     if image_type == 'dslr':
-        distort_params = list(colmap_camera.params[4:]) + [0, 0]
+        distort_params = np.array(list(colmap_camera.params[4:]) + [0, 0])
 
     return colmap_camera, image_names, poses, distort_params
 
