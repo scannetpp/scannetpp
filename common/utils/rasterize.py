@@ -1,15 +1,40 @@
-from pytorch3d.structures import Meshes
-from pytorch3d.utils import cameras_from_opencv_projection
-from pytorch3d.renderer import (
-    RasterizationSettings, 
-    MeshRasterizer,  
-    fisheyecameras
-)
+try:
+    from pytorch3d.structures import Meshes
+    from pytorch3d.utils import cameras_from_opencv_projection
+    from pytorch3d.renderer import (
+        RasterizationSettings, 
+        MeshRasterizer,  
+        fisheyecameras
+    )
+except:
+    pass
 import torch
 import numpy as np
+import cv2
 
 # TODO: make this configurable
 device = torch.device("cuda:0")
+
+def undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2):
+    # apply undistortion to rasterization (nearest neighbor), zbuf (linear) and image (linear)
+    pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
+        interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
+    )
+    # zbuf is tensor
+    zbuf = torch.Tensor(cv2.remap(zbuf.numpy(), undistort_map1, undistort_map2,
+        interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
+    ))
+
+    return pix_to_face, zbuf
+
+def upsample_rasterization(pix_to_face, zbuf, img_height, img_width):
+    # upsample pixtoface and zbuf
+    pix_to_face = torch.nn.functional.interpolate(pix_to_face.unsqueeze(0).unsqueeze(0).float(),
+                                                    size=(img_height, img_width), mode='nearest').squeeze().squeeze().long()
+    zbuf = torch.nn.functional.interpolate(zbuf.unsqueeze(0).unsqueeze(0).float(),
+                                                    size=(img_height, img_width), mode='nearest').squeeze().squeeze()
+
+    return pix_to_face, zbuf
 
 def get_opencv_cameras_batch(poses, img_height, img_width, intrinsic_mat):
     R = torch.Tensor(poses[:, :3, :3])
