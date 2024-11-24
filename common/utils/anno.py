@@ -108,6 +108,8 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
 
             obj_mask_3d = anno['vertex_obj_ids'] == obj_id
             obj_verts_ndx = np.where(obj_mask_3d)[0] # indices of vertices in this object
+            if len(obj_verts_ndx) == 0:
+                continue
             # store total #vertices of object
             visibility_data['objects'][obj_id]['num_total_vertices'] = len(obj_verts_ndx)
 
@@ -126,8 +128,8 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
             # keep only the >= 0 values
             obj_zbuf = obj_zbuf[obj_zbuf >= 0]
 
-            zbuf_min = obj_zbuf.min() if len(obj_zbuf) > 0 else -1
-            zbuf_max = obj_zbuf.max() if len(obj_zbuf) > 0 else -1
+            zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
+            zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
 
             visibility_data['images'][image_name]['objects'][obj_id] = {
                 'bbox_2d': obj_bbox,
