@@ -20,13 +20,15 @@ from common.utils.utils import run_command, load_yaml_munch, load_json, read_txt
 def main(args):
     cfg = load_yaml_munch(args.config_file)
 
-    # get the scenes to process
-    if cfg.get("scene_ids"):
+    # get the scenes to process, specify any one
+    if cfg.get('scene_list_file'):
+        scene_ids = read_txt_list(cfg.scene_list_file)
+    elif cfg.get('scene_ids'):
         scene_ids = cfg.scene_ids
-    elif cfg.get("splits"):
+    elif cfg.get('splits'):
         scene_ids = []
         for split in cfg.splits:
-            split_path = Path(cfg.data_root) / "splits" / f"{split}.txt"
+            split_path = Path(cfg.data_root) / 'splits' / f'{split}.txt'
             scene_ids += read_txt_list(split_path)
 
     output_dir = cfg.get("output_dir")
