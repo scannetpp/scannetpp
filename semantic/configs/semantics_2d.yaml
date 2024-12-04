@@ -1,0 +1,36 @@
+############### input data #################
+# release data downloaded to disk
+data_root: <data root>
+scene_list_file: <list file>
+rasterout_dir: <raster output dir>
+visiblity_cache_dir: <visiblity cache dir>
+filter_scenes: []
+exclude_scenes: []
+# image type - iphone or dslr
+image_type: dslr
+undistort_dslr: true
+create_visiblity_cache_only: false
+############### hyperparams #################
+# use topk views with visiblity of object vertices
+visibility_topk: 3
+# min size of the bbox of an object (each side must be greater than this in pixels)
+bbox_min_side_pix: 50
+# subsample images 
+subsample_factor: 20
+# atleast this fraction of the object's vertices should be visible in the image
+# set to 0 to ignore threshold
+obj_visible_thresh: 0.1
+# object should cover atleast this fraction of the image's pixels
+# set to 0 to ignore threshold
+obj_pixel_thresh: 0.00
+# object should be within this distance from the camera (meters) (set large number to include all objects)
+obj_dist_thresh: 999
+# expand the bbox by this fraction in each direction
+bbox_expand_factor: 0.1
+############### output #################
+save_dir_root: <output dir>
+save_dir: test_semantics_2d
+############### dbg #################
+dbg:
+  # viz obj ids in 2d for each image
+  viz_obj_ids: true
