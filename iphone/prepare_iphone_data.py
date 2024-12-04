@@ -81,8 +81,10 @@ def extract_depth(scene):
 def main(args):
     cfg = load_yaml_munch(args.config_file)
 
-    # get the scenes to process
-    if cfg.get('scene_ids'):
+    # get the scenes to process, specify any one
+    if cfg.get('scene_list_file'):
+        scene_ids = read_txt_list(cfg.scene_list_file)
+    elif cfg.get('scene_ids'):
         scene_ids = cfg.scene_ids
     elif cfg.get('splits'):
         scene_ids = []
