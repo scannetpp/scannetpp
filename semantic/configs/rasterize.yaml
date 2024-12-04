@@ -1,0 +1,26 @@
+# release data downloaded to disk
+data_root: <data root>
+scene_list_file: <list file>
+
+filter_scenes: []
+
+# image type - iphone or dslr
+image_type: dslr
+
+no_log: true
+
+# subsample images 
+subsample_factor: 20
+# downsample images and rasterize
+image_downsample_factor: null
+
+rasterout_dir: <output dir>
+
+limit_images: None
+
+wandb_group: null
+wandb_notes: null
+
+batch_size: 1
+limit_batches: null
+skip_existing: false

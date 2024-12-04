@@ -21,7 +21,7 @@ Table of Contents
       * [Prepare Semantic/Instance Ground Truth Files for Evaluation](#prepare-semanticinstance-ground-truth-files-for-evaluation)
       * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
       * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
-      * [Rasterize 3D Semantics onto 2D Images](#rasterize-3d-semantics-onto-2d-images)
+      * [Rasterize 3D Meshes onto 2D Images](#rasterize-3d-meshes-onto-2d-images)
    * [Novel View Synthesis](#novel-view-synthesis)
       * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
 
@@ -188,11 +188,38 @@ Then run
 python -m semantic.eval.eval_instance semantic/configs/eval_instance.yml
 ```
 
-### Rasterize 3D Semantics onto 2D Images
-To get 3D semantics onto 2D DSLR images, run 
+### Rasterize 3D Meshes onto 2D Images 
+(Requires Pytorch3D and a GPU)
+
+Use this to rasterize the mesh onto DSLR or iPhone images and save the 2D-3D mappings (pixel-to-face) to file.
+This can later be used to get the 3D semantic and instance annotations on the 2D images.
+
+Useful params to configure - 
+- `image_type`: `dslr` or `iphone`
+- `image_downsample_factor`: rasterize onto downsampled images, since the 2D images have a very high resolution
+- `subsample_factor`: rasterize every Nth image
+- `batch_size`: for rasterization
+
 ```
-python -m semantic.prep.rasterize_semantics_2d semantic/configs/rasterize_semantics_2d.yml
+python -m semantic.prep.rasterize
 ```
+
+(Note: This script uses a Hydra config, no need to specify the config path)
+
+### 2D Semantics
+Use the rasterization from the previous step to get semantic and instance annotations on the 2D images, either iPhone or DSLR.
+Then visualize the object IDs on the image, crop individual objects from the images, etc. 
+
+The rasterization data also contains the `zbuf` depth which can be used for backprojection, depth estimation tasks or filtering by distance from the camera.
+
+Configure the `image_type` and `subsample_factor` as before. Use `undistort_dslr` to get semantics on the undistorted images
+
+```
+python -m semantic.prep.semantics_2d
+```
+
+Visualized object IDs should look like this 
+![object IDs in 2D](assets/obj_viz.png "Objects IDs on Undistorted DSLR Image")
 
 ## Novel View Synthesis
 ### Novel View Synthesis Evaluation (DSLR)
