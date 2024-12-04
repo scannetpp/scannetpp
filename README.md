@@ -22,6 +22,7 @@ Table of Contents
       * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
       * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
       * [Rasterize 3D Meshes onto 2D Images](#rasterize-3d-meshes-onto-2d-images)
+      * [Get Semantics on 2D Images](#2d-semantics)
    * [Novel View Synthesis](#novel-view-synthesis)
       * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
 
