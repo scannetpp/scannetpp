@@ -199,10 +199,12 @@ Useful params to configure -
 - `image_downsample_factor`: rasterize onto downsampled images, since the 2D images have a very high resolution
 - `subsample_factor`: rasterize every Nth image
 - `batch_size`: for rasterization
+
 ```
-python -m semantic.prep.rasterize semantic/configs/rasterize.yml
+python -m semantic.prep.rasterize
 ```
 
+(Note: This script uses a Hydra config, no need to specify the config path)
 ### 2D Semantics
 
 
