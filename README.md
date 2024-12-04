@@ -1,32 +1,39 @@
-# ScanNet++ Toolkit
+# Toolkit for ScanNet++: A High-Fidelity Dataset of 3D Indoor Scenes
+
+[<ins>Paper</ins>](https://arxiv.org/abs/2308.11417) | [<ins>Dataset</ins>](https://kaldir.vc.in.tum.de/scannetpp/) | [<ins>Video</ins>](https://www.youtube.com/watch?v=E6P9e2r6M8I&pp=ygUJc2Nhbm5ldCsr)
 
 ![teaser](img/teaser.jpg)
 
-Table of Contents
-=================
-
-* [ScanNet++ Toolkit](#scannet-toolkit)
-   * [Requirements](#requirements)
-   * [DSLR](#dslr)
-      * [Undistortion: convert fisheye images to pinhole with OpenCV](#undistortion-convert-fisheye-images-to-pinhole-with-opencv)
-      * [Downscale the DSLR images](#downscale-the-dslr-images)
-      * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
-      * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
-   * [iPhone](#iphone)
-      * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
-   * [Semantics](#semantics)
-      * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
-      * [Split PTH files into chunks for training](#split-pth-files-into-chunks-for-training)
-      * [Visualize training data](#visualize-training-data)
-      * [Prepare Semantic/Instance Ground Truth Files for Evaluation](#prepare-semanticinstance-ground-truth-files-for-evaluation)
-      * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
-      * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
-      * [Rasterize 3D Meshes onto 2D Images](#rasterize-3d-meshes-onto-2d-images)
-      * [Get Semantics on 2D Images](#2d-semantics)
-   * [Novel View Synthesis](#novel-view-synthesis)
-      * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+---
+Contents
+===
+* [Requirements](#requirements)
+* [DSLR](#dslr)
+    * [Undistortion: convert fisheye images to pinhole with OpenCV](#undistortion-convert-fisheye-images-to-pinhole-with-opencv)
+    * [Downscale the DSLR images](#downscale-the-dslr-images)
+    * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
+    * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
+* [iPhone](#iphone)
+    * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
+* [3D and 2D Semantics](#semantics)
+    * [Prepare 3D Semantics Training Data](#prepare-3d-semantics-training-data)
+    * [Split PTH files into chunks for training](#split-pth-files-into-chunks-for-training)
+    * [Visualize training data](#visualize-training-data)
+    * [Prepare Semantic/Instance Ground Truth Files for Evaluation](#prepare-semanticinstance-ground-truth-files-for-evaluation)
+    * [3D Semantic Segmentation Evaluation](#3d-semantic-segmentation-evaluation)
+    * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
+    * [Rasterize 3D Meshes onto 2D Images](#rasterize-3d-meshes-onto-2d-images)
+    * [Get Semantics on 2D Images](#2d-semantics)
+* [Novel View Synthesis](#novel-view-synthesis)
+    * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+* [Contributing](#contributing)
+* [Citation](#citation)
 
 <!-- Created by https://github.com/ekalinin/github-markdown-toc -->
+---
+[Chandan Yeshwanth](https://scholar.google.com/citations?user=v7SFceoAAAAJ&hl=en)\*, [Yueh-Cheng Liu](https://liu115.github.io/)\*, [Angela Dai](https://www.3dunderstanding.org/), [Matthias Nießner](https://niessnerlab.org/)
+
+**ICCV 2023**
 
 ## Dataset Documentation
 Please refer to the [official dataset documentation](https://kaldir.vc.in.tum.de/scannetpp/documentation) which describes the files in the dataset.
@@ -243,3 +250,18 @@ SCENE_ID1/
 
 NOTE:
 The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
+
+## Contributing
+Please open a PR and we'll be happy to review it!
+
+## Citation
+If you find our code, dataset or paper useful, please consider citing
+```
+@inproceedings{yeshwanth2023scannet++,
+  title={Scannet++: A high-fidelity dataset of 3d indoor scenes},
+  author={Yeshwanth, Chandan and Liu, Yueh-Cheng and Nie{\ss}ner, Matthias and Dai, Angela},
+  booktitle={Proceedings of the IEEE/CVF International Conference on Computer Vision},
+  pages={12--22},
+  year={2023}
+}
+```
