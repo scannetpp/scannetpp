@@ -4,7 +4,7 @@
 
 ![teaser](img/teaser.jpg)
 
-[<ins>Chandan Yeshwanth</ins>](https://scholar.google.com/citations?user=v7SFceoAAAAJ&hl=en)\*, [<ins>Yueh-Cheng Liu</ins>](https://liu115.github.io/)\*, [<ins>Angela Dai</ins>](https://www.3dunderstanding.org/) and [<ins>Matthias Nießner</ins>](https://niessnerlab.org/)
+[<ins>Chandan Yeshwanth</ins>](https://scholar.google.com/citations?user=v7SFceoAAAAJ&hl=en)\*, [<ins>Yueh-Cheng Liu</ins>](https://liu115.github.io/)\*, [<ins>Matthias Nießner</ins>](https://niessnerlab.org/) and [<ins>Angela Dai</ins>](https://www.3dunderstanding.org/)
 
 **ICCV 2023**
 
