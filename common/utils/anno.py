@@ -1,6 +1,8 @@
 '''
 utils related to 3d semantic+instance annotations
 '''
+
+from torch_scatter import scatter_mean
 from collections import defaultdict
 import json
 import numpy as np
@@ -212,6 +214,38 @@ def load_annotation(anno_path, bboxes_only=False, segments_path=None, return_ver
         
     return ret_dict
 
+def get_pixel_props_on_vtx(pix_to_face, pix_prop, mesh):
+    '''
+    pix_to_face: output of rasterization, h,w (292,438 for 1/4 downsampled`)
+    pix_prop: some property on the pixels: h,w,dim
+    mesh: open3d mesh
+
+    allow storing n-dim features
+
+    return:
+        num_vertices,dim tensor with features
+        vtx_ndx = the indices of the vertices that have features
+    '''
+    valid_pix_to_face =  pix_to_face[:, :] != -1
+
+    mesh_faces_np = np.array(mesh.triangles) # F,3
+    # TODO: interpolate features onto vertices using bary coords + aggregate from multiple faces
+    face_indices = pix_to_face[valid_pix_to_face] # faces that are mapped to
+    vtx_ndx = mesh_faces_np[face_indices][:, 0] # corresponding vtx indices
+    # each vertex gets the average of features mapped onto it, use scatter mean
+    face_features = pix_prop[valid_pix_to_face] # features on faces
+
+    all_face_features = torch.zeros(len(mesh_faces_np), face_features.shape[1], device=pix_prop.device)
+    all_face_features[face_indices] = face_features
+
+    vtx_props = scatter_mean(face_features, torch.LongTensor(vtx_ndx).to(pix_prop.device), dim=0, dim_size=len(mesh.vertices))
+    
+    # unique vertices that got features now
+    unique_vtx_ndx = np.unique(vtx_ndx)
+
+    return vtx_props, unique_vtx_ndx
+
+
 def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
     '''
     pix_to_face: output of rasterization
@@ -226,6 +260,7 @@ def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
 
     # pix to obj id
     pix_vtx_prop = np.zeros_like(pix_to_face)
+    # pick the first vertex of each face
     pix_vtx_prop[valid_pix_to_face] = vtx_prop[mesh_faces_np[pix_to_face[valid_pix_to_face]][:, 0]]
 
     return pix_vtx_prop.squeeze()
