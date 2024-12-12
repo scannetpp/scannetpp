@@ -1,6 +1,12 @@
 import cv2
 import numpy as np
 
+def adjust_intrinsic_matrix(intrinsic, factor):
+    # divide fx, fy, cx, cy by factor
+    intrinsic /= factor
+    intrinsic[2, 2] = 1
+    return intrinsic
+
 def get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width):
     undistort_map1, undistort_map2 = cv2.fisheye.initUndistortRectifyMap(
             intrinsic, distort_params, np.eye(3), undistort_intrinsic, (img_width, img_height), cv2.CV_32FC1
