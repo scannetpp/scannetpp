@@ -28,6 +28,7 @@ Contents
     * [3D Instance Segmentation Evaluation](#3d-instance-segmentation-evaluation)
     * [Rasterize 3D Meshes onto 2D Images](#rasterize-3d-meshes-onto-2d-images)
     * [Get Semantics on 2D Images](#2d-semantics)
+    * [Select images with best coverage](#select-images-with-best-coverage)
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
 * [Contributing](#contributing)
@@ -221,6 +222,15 @@ python -m semantic.prep.semantics_2d
 
 Visualized object IDs should look like this 
 ![object IDs in 2D](assets/obj_viz.png "Objects IDs on Undistorted DSLR Image")
+
+### Select Images with Best Coverage
+We provide 2 useful functions to select 2D images and save these to a cache file
+
+`scannetpp.common.utils.anno.get_best_views_from_cache`: Order the subsampled images by the next best view that increases the coverage of the scene.
+
+`from scannetpp.common.utils.anno.get_visiblity_from_cache`: Find the visibility of each object in each subsampled image, to filter by the desired visibility
+
+Both functions save the visibility/image list to a cache file so that they don't have to be recomputed each time.
 
 ## Novel View Synthesis
 ### Novel View Synthesis Evaluation (DSLR)
