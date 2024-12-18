@@ -131,7 +131,7 @@ class ScannetppScene_Release:
     
     @property
     def iphone_video_path(self):
-        return self.iphone_data_dir / 'rgb.mkv'
+        return self.iphone_data_dir / 'rgb.mp4'
     
     @property
     def iphone_rgb_dir(self):
