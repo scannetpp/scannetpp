@@ -30,6 +30,80 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
 
     return visiblity_data
 
+def get_best_views_from_cache(scene, cache_dir, rasterout_dir, image_type, subsample_factor, undistort_dslr):
+    cached_path = Path(cache_dir) / f'{scene.scene_id}.pth'
+    if cached_path.exists():
+        print('Best view data exists, loading from cache:', cached_path)
+        best_view_data = torch.load(cached_path)
+    else:
+        best_view_data = compute_best_views(scene, rasterout_dir, image_type, subsample_factor, undistort_dslr)
+        print('Saving best view data to cache:', cached_path)
+        torch.save(best_view_data, cached_path)
+    return best_view_data
+
+def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistort_dslr=True):
+    '''
+    order the images based on how many new vertices are visible after adding each one
+    first create list of images and images that see a vertex/face, for each vertex/face in the scene
+    then pick image that sees the most faces, set it to -1, and repeat
+    output = list of image names in order of max to min added visiblity
+    '''
+    mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
+    faces = np.array(mesh.triangles)
+
+    # get list of images
+    # get the list of iphone/dslr images and poses
+    colmap_camera, image_list, _, distort_params = get_camera_images_poses(scene, subsample_factor, image_type)
+    # keep first 4 elements
+    distort_params = distort_params[:4]
+
+    intrinsic = camera_to_intrinsic(colmap_camera)
+    img_height, img_width = colmap_camera.height, colmap_camera.width
+
+    if image_type == 'dslr' and undistort_dslr:
+        undistort_intrinsic = compute_undistort_intrinsic(intrinsic, img_height, img_width, distort_params)
+        undistort_map1, undistort_map2 = get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width)
+
+    # num faces, num images
+    face_seen_ids = np.ones((len(faces), len(image_list)), dtype=np.int32) * -1
+
+    best_views = []
+
+    # for each image
+    for image_ndx, image_name in enumerate(tqdm(image_list, desc='image')):
+        rasterout_path = Path(raster_dir) / scene.scene_id / f'{image_name}.pth'
+        raster_out_dict = torch.load(rasterout_path)
+
+        pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
+        zbuf = raster_out_dict['zbuf'].squeeze().cpu()
+
+        rasterized_dims = list(pix_to_face.shape)
+
+        if rasterized_dims != [img_height, img_width]: # upsample
+            pix_to_face, zbuf = upsample_rasterization(pix_to_face, zbuf, img_height, img_width)
+
+        pix_to_face = pix_to_face.numpy()
+
+        if image_type == 'dslr' and undistort_dslr: # undistort
+            pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2)
+                
+        valid_pix_to_face =  pix_to_face[:, :] != -1
+        face_ndx = pix_to_face[valid_pix_to_face]
+
+        face_seen_ids[face_ndx, image_ndx] = image_ndx
+
+    for _ in tqdm(range(len(image_list)), desc='find_next_image'):
+        # find the image that currently sees the most faces
+        face_seen_counts = np.sum(face_seen_ids != -1, axis=0)
+        best_image_ndx = np.argmax(face_seen_counts)
+        best_views.append(image_list[best_image_ndx])
+        # set the faces seen by this image to -1, for all images! dont need to see them again
+        faces_seen = face_seen_ids[:, best_image_ndx] != -1 # faces seen by the current best image
+        face_seen_ids[faces_seen, :] = -1
+
+    return best_views
+
+
 def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, undistort_dslr=True):
     '''
     dict for 1 scene
