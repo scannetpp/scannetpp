@@ -21,7 +21,7 @@ def undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2):
         interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
     )
     # zbuf is tensor
-    zbuf = torch.Tensor(cv2.remap(zbuf.numpy(), undistort_map1, undistort_map2,
+    zbuf = torch.Tensor(cv2.remap(zbuf, undistort_map1, undistort_map2,
         interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
     ))
 
