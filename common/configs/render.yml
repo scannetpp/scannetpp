@@ -6,6 +6,9 @@ render_iphone: True
 # Set True to render depth for dslr frames
 render_dslr: False
 
+# Set True to render depth for undistorted frames (dslr only)
+# render_undistorted: True
+
 splits: [nvs_sem_train, nvs_sem_val]
 
 # Specify scene ids if you want to render depth for specific scenes
