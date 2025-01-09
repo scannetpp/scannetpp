@@ -1,13 +1,19 @@
 '''
 utils related to 3d semantic+instance annotations
 '''
-
-from torch_scatter import scatter_mean
+try:
+    from torch_scatter import scatter_mean
+except ImportError:
+    print('torch_scatter not found')
+    pass
 from collections import defaultdict
 import json
 import numpy as np
 from pathlib import Path
-import torch
+try:
+    import torch
+except ImportError:
+    pass
 from tqdm import tqdm
 import open3d as o3d
 
@@ -41,7 +47,7 @@ def get_best_views_from_cache(scene, cache_dir, rasterout_dir, image_type, subsa
         torch.save(best_view_data, cached_path)
     return best_view_data
 
-def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistort_dslr=True):
+def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistort_dslr):
     '''
     order the images based on how many new vertices are visible after adding each one
     first create list of images and images that see a vertex/face, for each vertex/face in the scene

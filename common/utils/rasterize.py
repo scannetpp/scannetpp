@@ -6,14 +6,13 @@ try:
         MeshRasterizer,  
         fisheyecameras
     )
+    import torch
+    device = torch.device("cuda:0")
 except:
     pass
-import torch
 import numpy as np
 import cv2
 
-# TODO: make this configurable
-device = torch.device("cuda:0")
 
 def undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2):
     # apply undistortion to rasterization (nearest neighbor), zbuf (linear) and image (linear)
