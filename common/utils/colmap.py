@@ -529,6 +529,24 @@ def rotmat2qvec(R):
         qvec *= -1
     return qvec
 
+def get_camera_intrinsics(scene, image_type):
+    # this has all the camera info and image list with poses
+    colmap_dir = scene.iphone_colmap_dir if image_type == 'iphone' else scene.dslr_colmap_dir
+
+    # read camera intrinsics
+    intrinsics_file = colmap_dir / 'cameras.txt'
+    # there is only 1 camera model, get it
+    # reads only cx cy fx fy
+    colmap_camera = list(read_cameras_text(intrinsics_file).values())[0]
+
+    # params [0,1,2,3] give the intrinsic
+    distort_params = None
+
+    if image_type == 'dslr':
+        distort_params = np.array(list(colmap_camera.params[4:]) + [0, 0])
+
+    return colmap_camera, distort_params
+
 def get_camera_images_poses(scene, subsample_factor, image_type):
     # this has all the camera info and image list with poses
     colmap_dir = scene.iphone_colmap_dir if image_type == 'iphone' else scene.dslr_colmap_dir
@@ -549,7 +567,7 @@ def get_camera_images_poses(scene, subsample_factor, image_type):
     image_names = [e.name for e in subsampled_extrinsics]
     poses = [e.to_transform_mat() for e in subsampled_extrinsics]
 
-        # params [0,1,2,3] give the intrinsic
+    # params [0,1,2,3] give the intrinsic
     distort_params = None
 
     if image_type == 'dslr':

@@ -39,11 +39,9 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
 def get_best_views_from_cache(scene, cache_dir, rasterout_dir, image_type, subsample_factor, undistort_dslr):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.pth'
     if cached_path.exists():
-        print('Best view data exists, loading from cache:', cached_path)
         best_view_data = torch.load(cached_path)
     else:
         best_view_data = compute_best_views(scene, rasterout_dir, image_type, subsample_factor, undistort_dslr)
-        print('Saving best view data to cache:', cached_path)
         torch.save(best_view_data, cached_path)
     return best_view_data
 
@@ -91,7 +89,7 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
         pix_to_face = pix_to_face.numpy()
 
         if image_type == 'dslr' and undistort_dslr: # undistort
-            pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2)
+            pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf.numpy(), undistort_map1, undistort_map2)
                 
         valid_pix_to_face =  pix_to_face[:, :] != -1
         face_ndx = pix_to_face[valid_pix_to_face]
