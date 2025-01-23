@@ -1,4 +1,5 @@
 try:
+    # rasterization functions need these
     from pytorch3d.structures import Meshes
     from pytorch3d.utils import cameras_from_opencv_projection
     from pytorch3d.renderer import (
@@ -6,6 +7,10 @@ try:
         MeshRasterizer,  
         fisheyecameras
     )
+except:
+    pass
+try:
+    # some functions need only torch
     import torch
     device = torch.device("cuda:0")
 except:
