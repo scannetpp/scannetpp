@@ -1,16 +1,24 @@
 ############### input data #################
 # release data downloaded to disk
-data_root: <data root>
-scene_list_file: <list file>
-rasterout_dir: <raster output dir>
-visiblity_cache_dir: <visiblity cache dir>
+data_root: 
+scene_list_file: 
+rasterout_dir: 
+visiblity_cache_dir: null
 filter_scenes: []
 exclude_scenes: []
 # image type - iphone or dslr
 image_type: dslr
 undistort_dslr: true
 create_visiblity_cache_only: false
+
+########## tasks/data to be created ##########
+save_semantic_gt_2d: false
+semantic_classes_file: null
+viz_semantic_gt_2d: false
+semantic_2d_palette_path: null
+
 ############### hyperparams #################
+check_visibility: false
 # use topk views with visiblity of object vertices
 visibility_topk: 3
 # min size of the bbox of an object (each side must be greater than this in pixels)
@@ -27,9 +35,11 @@ obj_pixel_thresh: 0.00
 obj_dist_thresh: 999
 # expand the bbox by this fraction in each direction
 bbox_expand_factor: 0.1
+
 ############### output #################
-save_dir_root: <output dir>
-save_dir: test_semantics_2d
+save_dir_root: 
+save_dir: 
+
 ############### dbg #################
 dbg:
   # viz obj ids in 2d for each image

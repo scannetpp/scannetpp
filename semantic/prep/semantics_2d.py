@@ -3,11 +3,10 @@ Get 3D semantics onto 2D images using precomputed rasterization
 '''
 
 from common.utils.image import get_img_crop, load_image, save_img, viz_ids
-from omegaconf import DictConfig, OmegaConf
+from omegaconf import DictConfig
 from pathlib import Path
 import hydra
 from omegaconf import DictConfig
-import wandb
 
 from tqdm import tqdm
 import open3d as o3d
@@ -17,7 +16,7 @@ import cv2
 
 from common.utils.dslr import compute_undistort_intrinsic
 from common.utils.colmap import get_camera_images_poses, camera_to_intrinsic
-from common.utils.anno import get_bboxes_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper
+from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper, viz_sem_ids_2d
 from common.file_io import read_txt_list
 from common.scene_release import ScannetppScene_Release
 
@@ -51,6 +50,11 @@ def main(cfg : DictConfig) -> None:
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
 
+    if cfg.save_semantic_gt_2d:
+        semantic_classes = read_txt_list(cfg.semantic_classes_file)
+        semantic_colors = np.loadtxt(cfg.semantic_2d_palette_path, dtype=np.uint8)
+        print(f'Num semantic classes: {len(semantic_classes)}')
+
     # go through scenes
     for scene_id in tqdm(scene_list, desc='scene'):
         print(f'Running on scene: {scene_id}')
@@ -58,8 +62,9 @@ def main(cfg : DictConfig) -> None:
         # get object ids on the mesh vertices
         anno = load_anno_wrapper(scene)
 
-        # create visibility cache to pick topk images where an object is visible
-        visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, cfg.image_type, cfg.subsample_factor, cfg.undistort_dslr, anno=anno)
+        if cfg.create_visiblity_cache_only or cfg.check_visibility:
+            # create visibility cache to pick topk images where an object is visible
+            visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, cfg.image_type, cfg.subsample_factor, cfg.undistort_dslr, anno=anno)
         if cfg.create_visiblity_cache_only:
             print(f'Created visibility cache for {scene_id}')
             continue
@@ -130,6 +135,22 @@ def main(cfg : DictConfig) -> None:
             if cfg.dbg.viz_obj_ids: # save viz to file
                 out_path = viz_obj_ids_dir / scene_id / f'{image_name}.png'
                 viz_ids(img, pix_obj_ids, out_path)
+
+            # create semantics GT and of semantic ids on vertices, -1 = no semantic label
+            if cfg.save_semantic_gt_2d:
+                pix_sem_ids = get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes)
+                # make parent
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                # save to png file, smaller
+                out_path = save_dir / scene_id / f'{image_name}.png'
+                print(f'Saving 2d semantic anno to {out_path}')
+                cv2.imwrite(str(out_path), pix_sem_ids)
+
+                if cfg.viz_semantic_gt_2d:
+                    out_path = save_dir / scene_id / f'{image_name}_viz.png'
+                    print(f'Saving 2d semantic viz to {out_path}')
+                    viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path)
+                continue
 
             # get objid -> bbox x,y,w,h after upsampling rasterization, all the objs in this image
             bboxes_2d = get_bboxes_2d(pix_obj_ids)

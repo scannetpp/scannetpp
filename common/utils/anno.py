@@ -21,6 +21,46 @@ from scannetpp.common.utils.colmap import camera_to_intrinsic, get_camera_images
 from scannetpp.common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
 from scannetpp.common.utils.rasterize import undistort_rasterization, upsample_rasterization
 
+def viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path):
+    '''
+    pix_sem_ids: -1 = no label, 0-N = semantic id
+    semantic_colors: color palette, wrap label if it exceeds the palette size
+    out_path: save image here
+    '''
+    viz_sem_img = np.zeros((pix_sem_ids.shape[0], pix_sem_ids.shape[1], 3), dtype=np.uint8)
+    for sem_id in np.unique(pix_sem_ids):
+        if sem_id == -1:
+            continue
+        color = semantic_colors[sem_id % len(semantic_colors)]
+        viz_sem_img[pix_sem_ids == sem_id] = color
+
+    o3d.io.write_image(str(out_path), o3d.geometry.Image(viz_sem_img))
+
+
+def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes):
+    '''
+    pix obj ids: obj ids on pixels
+    anno: raw annotation with labels
+    semantic_classes: list of classes to generate 0-N semantic IDs
+
+    return: same size array as pix_obj_ids with semantic ids, -1 indicates no semantic label
+    '''
+    unique_obj_ids = np.unique(pix_obj_ids)
+    # exclude <= 0
+    unique_obj_ids = unique_obj_ids[unique_obj_ids > 0]
+
+    pix_sem_ids = np.ones_like(pix_obj_ids) * -1
+
+    for obj_id in unique_obj_ids:
+        obj_label = anno['objects'][obj_id]['label']
+        if obj_label in semantic_classes:
+            sem_id = semantic_classes.index(obj_label)
+        else:
+            sem_id = -1
+        pix_sem_ids[pix_obj_ids == obj_id] = sem_id
+
+    return pix_sem_ids
+
 def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, undistort_dslr=None, anno=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.pth'
     if cached_path.exists():
