@@ -115,7 +115,7 @@ def main(cfg : DictConfig) -> None:
                 cameras_batch = get_fisheye_cameras_batch(batch_poses, img_height, img_width, intrinsic_mat, distort_params)
             elif cfg.image_type == 'iphone':
                 # opencv cameras
-                cameras_batch = get_opencv_cameras_batch(poses, img_height, img_width, intrinsic_mat)
+                cameras_batch = get_opencv_cameras_batch(batch_poses, img_height, img_width, intrinsic_mat)
 
             bsize = len(batch_image_list)
 
