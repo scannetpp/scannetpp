@@ -16,6 +16,7 @@ save_semantic_gt_2d: false
 semantic_classes_file: null
 viz_semantic_gt_2d: false
 semantic_2d_palette_path: null
+skip_existing_semantic_gt_2d: false
 
 ############### hyperparams #################
 check_visibility: false
