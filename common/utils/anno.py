@@ -37,7 +37,7 @@ def viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path):
     o3d.io.write_image(str(out_path), o3d.geometry.Image(viz_sem_img))
 
 
-def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes):
+def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
     '''
     pix obj ids: obj ids on pixels
     anno: raw annotation with labels
@@ -49,14 +49,15 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes):
     # exclude <= 0
     unique_obj_ids = unique_obj_ids[unique_obj_ids > 0]
 
-    pix_sem_ids = np.ones_like(pix_obj_ids) * -1
+    # fill all with ignore label initially, could be +ve or -ve 
+    pix_sem_ids = np.ones_like(pix_obj_ids) * ignore_label
 
     for obj_id in unique_obj_ids:
         obj_label = anno['objects'][obj_id]['label']
         if obj_label in semantic_classes:
             sem_id = semantic_classes.index(obj_label)
         else:
-            sem_id = -1
+            sem_id = ignore_label
         pix_sem_ids[pix_obj_ids == obj_id] = sem_id
 
     return pix_sem_ids
