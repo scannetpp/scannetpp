@@ -104,7 +104,16 @@ def main(cfg : DictConfig) -> None:
                 image_dir = scene.dslr_resized_dir
             # load the image H, W, 3
             img_path = str(image_dir / image_name)
-            img = load_image(img_path) 
+            if not Path(img_path).exists():
+                print(f'Image not found: {img_path}, skipping')
+                continue
+            
+            try:
+                print(f'Loading image: {img_path}')
+                img = load_image(img_path) 
+            except:
+                print(f'Error loading image: {img_path}, skipping')
+                continue
 
             rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
             raster_out_dict = torch.load(rasterout_path)
@@ -130,7 +139,11 @@ def main(cfg : DictConfig) -> None:
                     interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
                 )
             # get object IDs on image
-            pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh)
+            try:
+                pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh)
+            except IndexError: # something wrong with the rasterization
+                print(f'Rasterization error in {scene_id}/{image_name}, skipping')
+                continue
 
             if cfg.dbg.viz_obj_ids: # save viz to file
                 out_path = viz_obj_ids_dir / scene_id / f'{image_name}.png'
@@ -138,11 +151,14 @@ def main(cfg : DictConfig) -> None:
 
             # create semantics GT and of semantic ids on vertices, -1 = no semantic label
             if cfg.save_semantic_gt_2d:
-                pix_sem_ids = get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes)
-                # make parent
+                out_path = save_dir / scene_id / f'{image_name}.png'
+                if cfg.skip_existing_semantic_gt_2d and out_path.exists():
+                    print(f'File exists: {out_path}, skipping')
+                    continue
+                # use 255 so that it can be saved as a PNG!
+                pix_sem_ids = get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=255)
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 # save to png file, smaller
-                out_path = save_dir / scene_id / f'{image_name}.png'
                 print(f'Saving 2d semantic anno to {out_path}')
                 cv2.imwrite(str(out_path), pix_sem_ids)
 
@@ -150,7 +166,7 @@ def main(cfg : DictConfig) -> None:
                     out_path = save_dir / scene_id / f'{image_name}_viz.png'
                     print(f'Saving 2d semantic viz to {out_path}')
                     viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path)
-                continue
+                continue # do only semantics, nothing else
 
             # get objid -> bbox x,y,w,h after upsampling rasterization, all the objs in this image
             bboxes_2d = get_bboxes_2d(pix_obj_ids)
