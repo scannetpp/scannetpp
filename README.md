@@ -270,11 +270,27 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 | PTV2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
 
 ### **Notes:**   
-- All **Model Checkpoints** are currently **TBA** (To Be Announced).
+- All **Model Checkpoints** will be released soon.
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
 - Configuration files can be found on [Pointcept PR 412](https://github.com/Pointcept/Pointcept/pull/412).
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/q1wvl161).
 
+
+### Instance Segmentation
+This table presents the AP50 results for different models on validation and test sets.
+| Method                         | AP50 (Val) | AP50 (Test) | Checkpoint | Logs    |
+|--------------------------------|------------|------------|------------|---------|
+| SGIFormer                      | 0.411      | 0.457      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h7lx0u4e)|
+| SPFormer                       | 0.421      | 0.435      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/rovcpos0)|
+| OneFormer3D                    | 0.411      | 0.433      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/cqz9ocyy)|
+| SPFormer-Pretrained Scannet    | 0.419      | 0.432      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/x7jrzcxy)|
+| PointGroup                     | 0.147      | 0.152      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/4u5o6paj)|
+
+### **Notes:**   
+- All **Model Checkpoints** will be released soon.
+- Implementation code and configuration code will be released soon.
+- A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).
+- Logs containing the title `freq` mean that the metric is average over 500 training steps.
 
 ## Contributing
 Please open a PR and we'll be happy to review it!
