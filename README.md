@@ -31,6 +31,7 @@ Contents
     * [Select images with best coverage](#select-images-with-best-coverage)
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+* [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
 
@@ -253,6 +254,8 @@ SCENE_ID1/
 
 NOTE:
 The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
+
+## Benchmarks
 
 ## Contributing
 Please open a PR and we'll be happy to review it!
