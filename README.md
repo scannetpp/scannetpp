@@ -269,7 +269,7 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 | SpUNet     | 0.478         | 0.723         | 0.456          | 0.683          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h87z3y4v) |
 | PTV2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
 
-### **Notes:**   
+**Notes:**   
 - All **Model Checkpoints** will be released soon.
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
 - Configuration files can be found on [Pointcept PR 412](https://github.com/Pointcept/Pointcept/pull/412).
@@ -286,7 +286,7 @@ This table presents the AP50 results for different models on validation and test
 | SPFormer-Pretrained Scannet    | 0.419      | 0.432      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/x7jrzcxy)|
 | PointGroup                     | 0.147      | 0.152      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/4u5o6paj)|
 
-### **Notes:**   
+**Notes:**   
 - All **Model Checkpoints** will be released soon.
 - Implementation code and configuration code will be released soon.
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).
