@@ -273,7 +273,7 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 - All **Model Checkpoints** are currently **TBA** (To Be Announced).
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
 - Configuration files can be found on [Pointcept PR 412](https://github.com/Pointcept/Pointcept/pull/412).
-- A compiled logs report foll methods can be found on [Wandb Logs](https://api.wandb.ai/links/streakfull-technical-university-of-munich/q1wvl161).
+- A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/q1wvl161).
 """
 
 ## Contributing
