@@ -288,7 +288,7 @@ This table presents the AP50 results for different models on validation and test
 
 **Notes:**   
 - All **Model Checkpoints** will be released soon.
-- Implementation code and configuration code will be released soon.
+- Implementation code and configuration code will be released soon  (Now in open PRs on pointcept  [Pointcept](https://github.com/Pointcept/Pointcept).
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).
 - Logs containing the title `freq` mean that the metric is average over 500 training steps.
 
