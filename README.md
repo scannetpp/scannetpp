@@ -31,6 +31,7 @@ Contents
     * [Select images with best coverage](#select-images-with-best-coverage)
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+* [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
 
@@ -253,6 +254,43 @@ SCENE_ID1/
 
 NOTE:
 The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
+
+## Benchmarks
+### Semantic Segmentation
+
+This table presents the **Top-1 IoU** and **Top-3 IoU** results for different models on validation and test sets.
+
+| Method     | Top-1 IoU (Val) | Top-3 IoU (Val) | Top-1 IoU (Test) | Top-3 IoU (Test) | Checkpoint | Logs |
+|------------|---------------|---------------|----------------|----------------|------------|------|
+| PTV3       | **0.488**     | 0.733         | **0.488**      | 0.725          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/ed0erarb) |
+| CAC        | 0.484         | 0.740         | 0.483          | 0.717          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/kxd0k65l) |
+| OACNN      | 0.476         | **0.762**     | 0.470          | **0.726**      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/gdt3zsq2) |
+| Octformer  | 0.477         | 0.737         | 0.460          | 0.691          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/ohktxawj) |
+| SpUNet     | 0.478         | 0.723         | 0.456          | 0.683          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h87z3y4v) |
+| PTV2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
+
+**Notes:**   
+- All **Model Checkpoints** will be released soon.
+- Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
+- Configuration files can be found on [Pointcept PR 412](https://github.com/Pointcept/Pointcept/pull/412) (Now merged on the main branch!).
+- A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/q1wvl161).
+
+
+### Instance Segmentation
+This table presents the AP50 results for different models on validation and test sets.
+| Method                         | AP50 (Val) | AP50 (Test) | Checkpoint | Logs    |
+|--------------------------------|------------|------------|------------|---------|
+| SGIFormer                      | 0.411      | 0.457      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h7lx0u4e)|
+| SPFormer                       | 0.421      | 0.435      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/rovcpos0)|
+| OneFormer3D                    | 0.411      | 0.433      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/cqz9ocyy)|
+| SPFormer-Pretrained Scannet    | 0.419      | 0.432      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/x7jrzcxy)|
+| PointGroup                     | 0.147      | 0.152      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/4u5o6paj)|
+
+**Notes:**   
+- All **Model Checkpoints** will be released soon.
+- Implementation code and configuration code will be released soon  (Now in open PRs on pointcept  [Pointcept](https://github.com/Pointcept/Pointcept).
+- A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).
+- Logs containing the title `freq` mean that the metric is average over 500 training steps.
 
 ## Contributing
 Please open a PR and we'll be happy to review it!
