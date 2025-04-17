@@ -113,12 +113,24 @@ class ScannetppScene_Release:
         return self.dslr_dir / 'original_anon_masks'
     
     @property
+    def dslr_resized_undistorted_dir(self):
+        return self.dslr_dir / 'resized_undistorted_images'
+    
+    @property
+    def dslr_resized_undistorted_mask_dir(self):
+        return self.dslr_dir / 'resized_undistorted_masks'
+    
+    @property
     def dslr_colmap_dir(self):
         return self.dslr_dir / 'colmap'
     
     @property
     def dslr_nerfstudio_transform_path(self):
         return self.dslr_dir / 'nerfstudio' / 'transforms.json'
+    
+    @property
+    def dslr_nerfstudio_transform_undistorted_path(self):
+        return self.dslr_dir / 'nerfstudio' / 'transforms_undistorted.json'
     
     @property
     def dslr_train_test_lists_path(self):
