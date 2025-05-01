@@ -627,5 +627,11 @@ def color_correction_all(data_root, pred_dir, scene_list, upload_path, verbose=T
 
     return path_dicts
 
+if __name__ == "__main__":
+    data_root = ""
+    pred_dir = ""
+    scene_list = []
+    upload_path = ""
+
 
 

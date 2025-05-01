@@ -115,6 +115,25 @@ The rendered depth maps are single-channel uint16 png, where the unit is mm and 
 python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ```
 
+### NEW!!
+
+- After your submission for iPhone NVS track on our bechmark, we evaluate them before/after color-correction.
+- Since GTs for this task is taken by DSLR, you first need to undistort DSLR test frames by iPhone intrinsic in order to use them as a test frames for a training.
+- After a training, you will render a test frame given a DSLR test pose with iPhone intrinsic.
+- Due to the inconsistent lighting of iPhone compared to our DSLR, we introduced color-correction as a post-processing on our benchmark server.
+- Hence, the evaluation on the benchmark server will also be held after color-corrections.
+- The identical color-correction method used for our post-processing is now available on this toolkit.
+- Additional details can be found on the page: "Novel View Synthesis on iPhone Images" on our benchmark website.
+
+### Undistortion of DSLR (Ground Truth for iPhone NVS) given iPhone intrinsic
+```
+python -m ??
+```
+
+### Color-correction after NVS
+```
+python -m ??
+```
 
 ## Semantics
 
