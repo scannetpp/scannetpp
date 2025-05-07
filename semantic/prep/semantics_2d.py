@@ -62,12 +62,12 @@ def main(cfg : DictConfig) -> None:
         # get object ids on the mesh vertices
         anno = load_anno_wrapper(scene)
 
-        if cfg.create_visiblity_cache_only or cfg.check_visibility:
+        if cfg.check_visibility:
             # create visibility cache to pick topk images where an object is visible
             visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, cfg.image_type, cfg.subsample_factor, cfg.undistort_dslr, anno=anno)
-        if cfg.create_visiblity_cache_only:
-            print(f'Created visibility cache for {scene_id}')
-            continue
+            if cfg.create_visiblity_cache_only:
+                print(f'Created visibility cache for {scene_id}')
+                continue
 
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
@@ -116,6 +116,9 @@ def main(cfg : DictConfig) -> None:
                 continue
 
             rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
+            if not rasterout_path.is_file():
+                print(f'Rasterization not found for {image_name}')
+                continue
             raster_out_dict = torch.load(rasterout_path)
 
             # if dimensions dont match, raster is from downsampled image
@@ -176,29 +179,30 @@ def main(cfg : DictConfig) -> None:
                 if obj_id == 0:
                     continue
 
-                # enough of the object is seen
-                if visibility_data['images'][image_name]['objects'][obj_id].get('visible_vertices_frac', 0) < cfg.obj_visible_thresh:
-                    continue
-                
-                # check if obj occupies enough % of the image
-                if visibility_data['images'][image_name]['objects'][obj_id].get('visible_pixels_frac', 0) < cfg.obj_pixel_thresh:
-                    continue
-
-                if visibility_data['images'][image_name]['objects'][obj_id].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
-                    # object is too far away from camera
-                    continue
-                
-                if cfg.visibility_topk is not None:
-                    images_visibilites = []
-                    for i_name in visibility_data['images']:
-                        if obj_id in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][obj_id]:
-                            images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][obj_id]['visible_vertices_frac']))
-                    # sort descending by visibility
-                    images_visibilites.sort(key=lambda x: x[1], reverse=True)
-                    top_images = [i_name for i_name, _ in images_visibilites][:cfg.visibility_topk]
-                    # dont consider this object in this image
-                    if image_name not in top_images: 
+                if cfg.check_visibility:
+                    # enough of the object is seen
+                    if visibility_data['images'][image_name]['objects'][obj_id].get('visible_vertices_frac', 0) < cfg.obj_visible_thresh:
                         continue
+                    
+                    # check if obj occupies enough % of the image
+                    if visibility_data['images'][image_name]['objects'][obj_id].get('visible_pixels_frac', 0) < cfg.obj_pixel_thresh:
+                        continue
+
+                    if visibility_data['images'][image_name]['objects'][obj_id].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
+                        # object is too far away from camera
+                        continue
+                    
+                    if cfg.visibility_topk is not None:
+                        images_visibilites = []
+                        for i_name in visibility_data['images']:
+                            if obj_id in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][obj_id]:
+                                images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][obj_id]['visible_vertices_frac']))
+                        # sort descending by visibility
+                        images_visibilites.sort(key=lambda x: x[1], reverse=True)
+                        top_images = [i_name for i_name, _ in images_visibilites][:cfg.visibility_topk]
+                        # dont consider this object in this image
+                        if image_name not in top_images: 
+                            continue
 
                 # crop the object from the image
                 img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
