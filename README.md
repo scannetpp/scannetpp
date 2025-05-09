@@ -241,17 +241,17 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 
 | Method     | Top-1 IoU (Val) | Top-3 IoU (Val) | Top-1 IoU (Test) | Top-3 IoU (Test) | Checkpoint | Logs |
 |------------|---------------|---------------|----------------|----------------|------------|------|
-| PTV3       | **0.488**     | 0.733         | **0.488**      | 0.725          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/ed0erarb) |
+| PTv3       | **0.488**     | 0.733         | **0.488**      | 0.725          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/ed0erarb) |
 | CAC        | 0.484         | 0.740         | 0.483          | 0.717          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/kxd0k65l) |
 | OACNN      | 0.476         | **0.762**     | 0.470          | **0.726**      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/gdt3zsq2) |
 | Octformer  | 0.477         | 0.737         | 0.460          | 0.691          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/ohktxawj) |
 | SpUNet     | 0.478         | 0.723         | 0.456          | 0.683          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h87z3y4v) |
-| PTV2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
+| PTv2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
 
 **Notes:**   
 - All **Model Checkpoints** will be released soon.
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
-- Configuration files can be found on [Pointcept PR 412](https://github.com/Pointcept/Pointcept/pull/412) (Now merged on the main branch!).
+- Configuration files can be found on Pointcept ScanNet++ [Configurations](https://github.com/Pointcept/Pointcept/tree/main/configs/scannetpp), e.g. [Validation](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-0-base.py), [Test Submission](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-1-submit.py).
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/q1wvl161).
 
 
