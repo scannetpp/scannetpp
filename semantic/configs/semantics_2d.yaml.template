@@ -17,6 +17,7 @@ filter_images: []
 
 ########## tasks/data to be created ##########
 process_each_object: false
+save_undisorted_images: true
 save_semantic_gt_2d: false
 save_objid_gt_2d: true
 semantic_classes_file: null
