@@ -195,6 +195,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
     for image_name in tqdm(image_list, desc='image'):
         visibility_data['images'][image_name]['objects'] = defaultdict(dict)
 
+        # load rasterization
         rasterout_path = raster_dir / scene.scene_id / f'{image_name}.pth'
         raster_out_dict = torch.load(rasterout_path)
 
@@ -203,6 +204,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
 
         rasterized_dims = list(pix_to_face.shape)
 
+        # upsample rasterization to the image dims
         if rasterized_dims != [img_height, img_width]: # upsample
             pix_to_face, zbuf = upsample_rasterization(pix_to_face, zbuf, img_height, img_width)
 
@@ -223,7 +225,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
         img_verts = np.unique(faces_in_img)
 
         # get all required stats per object visible in the image
-        for (obj_id, obj_bbox) in enumerate(tqdm(bboxes_2d.items(), desc='obj', leave=False)):
+        for (obj_id, obj_bbox) in tqdm(bboxes_2d.items(), desc='obj', leave=False):
             if obj_id <= 0:
                 continue
 
