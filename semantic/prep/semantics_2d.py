@@ -46,8 +46,10 @@ def main(cfg : DictConfig) -> None:
     img_crop_dir =  save_dir / 'img_crops'
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
+    objid_gt_2d_dir = save_dir / 'obj_ids'
+    undistorted_dir = save_dir / 'undisorted'
 
-    for dir in [img_crop_dir, bbox_img_dir, viz_obj_ids_dir]:
+    for dir in [img_crop_dir, bbox_img_dir, viz_obj_ids_dir, objid_gt_2d_dir, undistorted_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -168,9 +170,23 @@ def main(cfg : DictConfig) -> None:
                 print(f'Rasterization error in {scene_id}/{image_name}, skipping')
                 continue
 
+            if cfg.filter_obj_ids:
+                print(f'Filtering obj ids: {cfg.filter_obj_ids}')
+                pix_obj_ids = np.where(np.isin(pix_obj_ids, cfg.filter_obj_ids), pix_obj_ids, -1)
+
             if cfg.dbg.viz_obj_ids: # save viz to file
                 out_path = viz_obj_ids_dir / scene_id / f'{image_name}.png'
                 viz_ids(img, pix_obj_ids, out_path)
+
+            if cfg.save_objid_gt_2d: # save obj ids to pth file
+                out_path = objid_gt_2d_dir / scene_id / f'{image_name}.pth'
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                torch.save(pix_obj_ids, out_path)
+
+            if cfg.save_undisorted_images:
+                out_path = undistorted_dir / scene_id / f'{image_name}.jpg'
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                save_img(img, out_path)
 
             # create semantics GT and of semantic ids on vertices, -1 = no semantic label
             if cfg.save_semantic_gt_2d:

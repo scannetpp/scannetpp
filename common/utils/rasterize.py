@@ -148,7 +148,7 @@ def get_fisheye_cameras_batch(poses, img_width, img_height, intrinsic_mat, disto
     # negate z back
     fisheye_T[:, -1] *= -1
 
-    radial_params_repeat = torch.Tensor([distort_params]) #.expand(bsize, -1)
+    radial_params_repeat = torch.Tensor(np.array([distort_params])) #.expand(bsize, -1)
 
     # focal, center, radial_params, R, T, use_radial
     fisheye_cameras = fisheyecameras.FishEyeCameras(
