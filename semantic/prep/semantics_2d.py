@@ -47,7 +47,7 @@ def main(cfg : DictConfig) -> None:
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
     objid_gt_2d_dir = save_dir / 'obj_ids'
-    undistorted_dir = save_dir / 'undisorted'
+    undistorted_dir = save_dir / 'undistorted'
 
     for dir in [img_crop_dir, bbox_img_dir, viz_obj_ids_dir, objid_gt_2d_dir, undistorted_dir]:
         dir.mkdir(parents=True, exist_ok=True)
@@ -183,7 +183,7 @@ def main(cfg : DictConfig) -> None:
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 torch.save(pix_obj_ids, out_path)
 
-            if cfg.save_undisorted_images:
+            if cfg.save_undistorted_images:
                 out_path = undistorted_dir / scene_id / f'{image_name}.jpg'
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 save_img(img, out_path)
