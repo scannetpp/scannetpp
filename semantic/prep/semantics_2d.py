@@ -44,12 +44,13 @@ def main(cfg : DictConfig) -> None:
     print('Save to dir:', save_dir)
 
     img_crop_dir =  save_dir / 'img_crops'
+    img_crop_nobg_dir = save_dir / 'img_crops_nobg'
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
     objid_gt_2d_dir = save_dir / 'obj_ids'
     undistorted_dir = save_dir / 'undistorted'
 
-    for dir in [img_crop_dir, bbox_img_dir, viz_obj_ids_dir, objid_gt_2d_dir, undistorted_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, objid_gt_2d_dir, undistorted_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -245,6 +246,17 @@ def main(cfg : DictConfig) -> None:
                     img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
                     img_crop_path = img_crop_dir / scene_id / f'{image_name}_{obj_id}.png'
                     save_img(img_crop, img_crop_path)
+
+                    # save image crop without background
+                    # crop pix_obj_ids to the same size
+                    pix_obj_ids_crop = get_img_crop(pix_obj_ids, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
+                    # make copy of img_crop
+                    img_crop_nobg = img_crop.copy()
+                    # set background to gray in regions not the current object
+                    img_crop_nobg[pix_obj_ids_crop != obj_id] = 128
+                    # save
+                    img_crop_nobg_path = img_crop_nobg_dir / scene_id / f'{image_name}_{obj_id}.png'
+                    save_img(img_crop_nobg, img_crop_nobg_path)
 
                     # draw a bbox around the object and save the full image
                     # create new image with bbox of the object draw on the full image
