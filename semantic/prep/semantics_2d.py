@@ -50,8 +50,9 @@ def main(cfg : DictConfig) -> None:
     viz_obj_ids_txt_dir = save_dir / 'viz_obj_ids_txt'
     objid_gt_2d_dir = save_dir / 'obj_ids'
     undistorted_dir = save_dir / 'undistorted'
+    obj_pcs_dir = save_dir / 'obj_pcs'
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -287,6 +288,18 @@ def main(cfg : DictConfig) -> None:
                     obj_label = anno['objects'][obj_id]['label']
                     # vertices in this object
                     obj_mask_3d = vtx_obj_ids == obj_id
+
+                    # save the object point cloud
+                    if cfg.save_obj_pcs:
+                        out_path = obj_pcs_dir / scene_id / f'{obj_id}.ply'
+                        # same for all images
+                        if not out_path.exists():
+                            out_path.parent.mkdir(parents=True, exist_ok=True)
+                            # get the pc for this object from the mesh, with colors
+                            obj_pc = o3d.geometry.PointCloud()
+                            obj_pc.points = o3d.utility.Vector3dVector(np.asarray(mesh.vertices)[obj_mask_3d])
+                            obj_pc.colors = o3d.utility.Vector3dVector(np.asarray(mesh.vertex_colors)[obj_mask_3d])
+                            o3d.io.write_point_cloud(str(out_path), obj_pc)
 
 if __name__ == "__main__":
     main()
