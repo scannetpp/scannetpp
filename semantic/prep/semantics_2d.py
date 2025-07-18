@@ -2,7 +2,7 @@
 Get 3D semantics onto 2D images using precomputed rasterization
 '''
 
-from common.utils.image import get_img_crop, load_image, save_img, viz_ids
+from common.utils.image import get_img_crop, load_image, save_img, viz_ids, viz_obj_ids_txt
 from omegaconf import DictConfig
 from pathlib import Path
 import hydra
@@ -47,10 +47,11 @@ def main(cfg : DictConfig) -> None:
     img_crop_nobg_dir = save_dir / 'img_crops_nobg'
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
+    viz_obj_ids_txt_dir = save_dir / 'viz_obj_ids_txt'
     objid_gt_2d_dir = save_dir / 'obj_ids'
     undistorted_dir = save_dir / 'undistorted'
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, objid_gt_2d_dir, undistorted_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -171,13 +172,18 @@ def main(cfg : DictConfig) -> None:
                 print(f'Rasterization error in {scene_id}/{image_name}, skipping')
                 continue
 
-            if cfg.filter_obj_ids:
+            if cfg.get('filter_obj_ids'):
                 print(f'Filtering obj ids: {cfg.filter_obj_ids}')
                 pix_obj_ids = np.where(np.isin(pix_obj_ids, cfg.filter_obj_ids), pix_obj_ids, -1)
 
             if cfg.dbg.viz_obj_ids: # save viz to file
                 out_path = viz_obj_ids_dir / scene_id / f'{image_name}.png'
                 viz_ids(img, pix_obj_ids, out_path)
+
+            if cfg.viz_obj_ids_txt:
+                # viz obj ids in different colors and write the obj id in the center of the bbox of the object
+                out_path = viz_obj_ids_txt_dir / scene_id / f'{image_name}.png'
+                viz_obj_ids_txt(img, pix_obj_ids, out_path)
 
             if cfg.save_objid_gt_2d: # save obj ids to pth file
                 out_path = objid_gt_2d_dir / scene_id / f'{image_name}.pth'
