@@ -1,4 +1,5 @@
 import argparse
+import json
 import os
 import sys
 from pathlib import Path
@@ -12,7 +13,7 @@ except ImportError:
     print("renderpy not installed. Please install renderpy from https://github.com/liu115/renderpy")
     sys.exit(1)
 
-from common.utils.colmap import read_model, write_model, Image
+from common.utils.colmap import read_model, write_model, Camera, Image
 from common.scene_release import ScannetppScene_Release
 from common.utils.utils import run_command, load_yaml_munch, load_json, read_txt_list
 
@@ -51,6 +52,18 @@ def main(args):
         for device in render_devices:
             if device == "dslr":
                 cameras, images, points3D = read_model(scene.dslr_colmap_dir, ".txt")
+                if cfg.get("render_undistorted", False):
+                    transform_path = scene.dslr_nerfstudio_undistorted_transform_path
+                    with open(transform_path, "r") as f:
+                        transform = json.load(f)
+                    camera = Camera(
+                        id=-1,
+                        model=transform["camera_model"],
+                        width=transform["w"],
+                        height=transform["h"],
+                        params=np.array([transform["fl_x"], transform["fl_y"], transform["cx"], transform["cy"]]),
+                    )
+                    cameras = {camera.id: camera}
             else:
                 cameras, images, points3D = read_model(scene.iphone_colmap_dir, ".txt")
             assert len(cameras) == 1, "Multiple cameras not supported"
@@ -68,8 +81,9 @@ def main(args):
 
             near = cfg.get("near", 0.05)
             far = cfg.get("far", 20.0)
-            rgb_dir = Path(cfg.output_dir) / scene_id / device / "render_rgb"
-            depth_dir = Path(cfg.output_dir) / scene_id / device / "render_depth"
+            suffix = "_undistorted" if cfg.get("render_undistorted", False) else ""
+            rgb_dir = Path(cfg.output_dir) / scene_id / device / f"render_rgb{suffix}"
+            depth_dir = Path(cfg.output_dir) / scene_id / device / f"render_depth{suffix}"
             rgb_dir.mkdir(parents=True, exist_ok=True)
             depth_dir.mkdir(parents=True, exist_ok=True)
             for image_id, image in tqdm(images.items(), f"Rendering {device} images"):
