@@ -43,6 +43,8 @@ def main(cfg : DictConfig) -> None:
     save_dir.mkdir(parents=True, exist_ok=True)
     print('Save to dir:', save_dir)
 
+    semantics_dir = save_dir / 'semantics'
+    semantics_viz_dir = save_dir / 'semantics_viz'
     img_crop_dir =  save_dir / 'img_crops'
     img_crop_nobg_dir = save_dir / 'img_crops_nobg'
     bbox_img_dir =  save_dir / 'img_bbox'
@@ -52,7 +54,7 @@ def main(cfg : DictConfig) -> None:
     undistorted_dir = save_dir / 'undistorted'
     obj_pcs_dir = save_dir / 'obj_pcs'
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, semantics_dir, semantics_viz_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -89,12 +91,13 @@ def main(cfg : DictConfig) -> None:
 
         # get the list of iphone/dslr images and poses
         # NOTE: should be the same as during rasterization
-        if cfg.filter_images:
+        if cfg.get('filter_images'):
             print(f'>>>>> Filtering images, subsample_factor is ignored')
             subsample_factor = 1
         else:
             subsample_factor = cfg.subsample_factor
         colmap_camera, image_list, poses, distort_params_orig = get_camera_images_poses(scene, subsample_factor, cfg.image_type)
+        print('Num images:', len(image_list))
         # keep first 4 elements
         distort_params = distort_params_orig[:4]
 
@@ -108,9 +111,13 @@ def main(cfg : DictConfig) -> None:
                 intrinsic, distort_params, np.eye(3), undistort_intrinsic, (img_width, img_height), cv2.CV_32FC1
             )
 
+        if cfg.get('limit_images'):
+            print(f'Limiting to {cfg.limit_images} images')
+            image_list = image_list[:cfg.limit_images]
+
         # go through list of images
         for image_ndx, image_name in enumerate(tqdm(image_list, desc='image', leave=False)):
-            if cfg.filter_images and image_name not in cfg.filter_images:
+            if cfg.get('filter_images') and image_name not in cfg.filter_images:
                 continue
             if cfg.image_type == 'iphone':
                 image_dir = scene.iphone_rgb_dir
@@ -198,7 +205,7 @@ def main(cfg : DictConfig) -> None:
 
             # create semantics GT and of semantic ids on vertices, -1 = no semantic label
             if cfg.save_semantic_gt_2d:
-                out_path = save_dir / scene_id / f'{image_name}.png'
+                out_path = semantics_dir / scene_id / f'{image_name}.png'
                 if cfg.skip_existing_semantic_gt_2d and out_path.exists():
                     print(f'File exists: {out_path}, skipping')
                     continue
@@ -210,7 +217,8 @@ def main(cfg : DictConfig) -> None:
                 cv2.imwrite(str(out_path), pix_sem_ids)
 
                 if cfg.viz_semantic_gt_2d:
-                    out_path = save_dir / scene_id / f'{image_name}_viz.png'
+                    out_path = semantics_viz_dir / scene_id / f'{image_name}_viz.png'
+                    out_path.parent.mkdir(parents=True, exist_ok=True)
                     print(f'Saving 2d semantic viz to {out_path}')
                     viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path)
                 continue # do only semantics, nothing else
