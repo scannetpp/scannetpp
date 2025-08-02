@@ -62,18 +62,19 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
     return pix_sem_ids
 
-def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, undistort_dslr=None, anno=None):
-    cached_path = Path(cache_dir) / f'{scene.scene_id}.pth'
+def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, undistort_dslr=None, limit_images=None, anno=None):
+    cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
-        visiblity_data = torch.load(cached_path)
+        visiblity_data = load_json(cached_path)
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
-        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, subsample_factor=subsample_factor, undistort_dslr=undistort_dslr)
+        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, subsample_factor=subsample_factor, undistort_dslr=undistort_dslr,
+                                           limit_images=limit_images)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
-        torch.save(visiblity_data, cached_path)
+        write_json(cached_path, visiblity_data)
 
     return visiblity_data
 
@@ -149,7 +150,7 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, undistort_dslr=True):
+def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, undistort_dslr=True, limit_images=None):
     '''
     dict for 1 scene
 
@@ -181,6 +182,10 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
     # get list of images
     # get the list of iphone/dslr images and poses
     colmap_camera, image_list, _, distort_params = get_camera_images_poses(scene, subsample_factor, image_type)
+    print(f'Num images for visibility check: {len(image_list)}')
+    if limit_images is not None:
+        image_list = image_list[:limit_images]
+        print(f'Limiting viz check to {limit_images} images')
     # keep first 4 elements
     distort_params = distort_params[:4]
 
@@ -234,7 +239,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
             if len(obj_verts_ndx) == 0:
                 continue
             # store total #vertices of object
-            visibility_data['objects'][obj_id]['num_total_vertices'] = len(obj_verts_ndx)
+            visibility_data['objects'][str(obj_id)]['num_total_vertices'] = len(obj_verts_ndx)
 
             # faces in this image -> vertices in this image
             faces_in_img = faces[face_ndx]
@@ -254,14 +259,15 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
             zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
             zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
 
-            visibility_data['images'][image_name]['objects'][obj_id] = {
-                'bbox_2d': obj_bbox,
+            # string keys for json
+            visibility_data['images'][image_name]['objects'][str(obj_id)] = {
+                'bbox_2d': list(obj_bbox),
                 'num_visible_vertices': len(intersection),
-                'visible_vertices_frac': visible_frac,
-                'num_visible_pixels': num_obj_pixels,
-                'visible_pixels_frac': num_obj_pixels / (img_height * img_width),
-                'zbuf_min': zbuf_min,
-                'zbuf_max': zbuf_max
+                'visible_vertices_frac': float(visible_frac),
+                'num_visible_pixels': int(num_obj_pixels),
+                'visible_pixels_frac': float(num_obj_pixels / (img_height * img_width)),
+                'zbuf_min': float(zbuf_min),
+                'zbuf_max': float(zbuf_max)
             }
 
     return visibility_data

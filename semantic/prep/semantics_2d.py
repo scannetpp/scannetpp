@@ -71,9 +71,20 @@ def main(cfg : DictConfig) -> None:
         # get object ids on the mesh vertices
         anno = load_anno_wrapper(scene)
 
+        if cfg.get('filter_obj_ids') and cfg.get('filter_objs_global'):
+            # anno['objects'] only for the given ids
+            anno['objects'] = {obj_id: anno['objects'][obj_id] for obj_id in cfg.filter_obj_ids}
+            valid_vtx_mask = np.isin(anno['vertex_obj_ids'], cfg.filter_obj_ids)
+            anno['vertex_obj_ids'][~valid_vtx_mask] = -1
+
         if cfg.check_visibility:
             # create visibility cache to pick topk images where an object is visible
-            visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, cfg.image_type, cfg.subsample_factor, cfg.undistort_dslr, anno=anno)
+            visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, 
+                                                       cfg.image_type, 
+                                                       cfg.subsample_factor, 
+                                                       cfg.undistort_dslr, 
+                                                       limit_images=cfg.limit_images,
+                                                       anno=anno)
             if cfg.create_visiblity_cache_only:
                 print(f'Created visibility cache for {scene_id}')
                 continue
@@ -83,8 +94,8 @@ def main(cfg : DictConfig) -> None:
         mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
 
         obj_ids = np.unique(vtx_obj_ids)
-        # remove 0
-        obj_ids = sorted(obj_ids[obj_ids != 0])
+        # remove <= 0
+        obj_ids = sorted(obj_ids[obj_ids > 0])
 
         obj_id_locations = {obj_id: anno['objects'][obj_id]['obb']['centroid'] for obj_id in obj_ids}
         obj_id_dims = {obj_id: anno['objects'][obj_id]['obb']['axesLengths'] for obj_id in obj_ids}
@@ -233,15 +244,25 @@ def main(cfg : DictConfig) -> None:
                         continue
 
                     if cfg.check_visibility:
+                        # no viz data for this image -> skip
+                        if image_name not in visibility_data['images']:
+                            print(f'No viz data for {image_name}, skipping')
+                            continue
+
+                        # have viz data for this object, otherwise dont process this object
+                        if str(obj_id) not in visibility_data['images'][image_name]['objects']:
+                            print(f'No viz data for {obj_id} in {image_name}, skipping')
+                            continue
+
                         # enough of the object is seen
-                        if visibility_data['images'][image_name]['objects'][obj_id].get('visible_vertices_frac', 0) < cfg.obj_visible_thresh:
+                        if visibility_data['images'][image_name]['objects'][str(obj_id)].get('visible_vertices_frac', 0) < cfg.obj_visible_thresh:
                             continue
                         
                         # check if obj occupies enough % of the image
-                        if visibility_data['images'][image_name]['objects'][obj_id].get('visible_pixels_frac', 0) < cfg.obj_pixel_thresh:
+                        if visibility_data['images'][image_name]['objects'][str(obj_id)].get('visible_pixels_frac', 0) < cfg.obj_pixel_thresh:
                             continue
 
-                        if visibility_data['images'][image_name]['objects'][obj_id].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
+                        if visibility_data['images'][image_name]['objects'][str(obj_id)].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
                             # object is too far away from camera
                             continue
                         
