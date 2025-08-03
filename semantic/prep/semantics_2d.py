@@ -85,7 +85,7 @@ def main(cfg : DictConfig) -> None:
                                                        cfg.undistort_dslr, 
                                                        limit_images=cfg.limit_images,
                                                        anno=anno)
-            if cfg.create_visiblity_cache_only:
+        if cfg.create_visiblity_cache_only:
                 print(f'Created visibility cache for {scene_id}')
                 continue
 
@@ -269,8 +269,9 @@ def main(cfg : DictConfig) -> None:
                         if cfg.visibility_topk is not None:
                             images_visibilites = []
                             for i_name in visibility_data['images']:
-                                if obj_id in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][obj_id]:
-                                    images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][obj_id]['visible_vertices_frac']))
+                                # convert obj keys to str always!
+                                if str(obj_id) in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][str(obj_id)]:
+                                    images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][str(obj_id)]['visible_vertices_frac']))
                             # sort descending by visibility
                             images_visibilites.sort(key=lambda x: x[1], reverse=True)
                             top_images = [i_name for i_name, _ in images_visibilites][:cfg.visibility_topk]
