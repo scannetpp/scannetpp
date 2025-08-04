@@ -1,0 +1,54 @@
+############### input data #################
+# release data downloaded to disk
+data_root: 
+scene_list_file: 
+rasterout_dir: 
+visiblity_cache_dir: null
+filter_scenes: []
+exclude_scenes: []
+# image type - iphone or dslr
+image_type: dslr
+undistort_dslr: true
+create_visiblity_cache_only: false
+
+############## other data filters ##########
+# names of images to process - if specified, ignore subsample_factor
+filter_images: []
+
+########## tasks/data to be created ##########
+process_each_object: false
+save_undistorted_images: true
+save_semantic_gt_2d: false
+save_objid_gt_2d: true
+semantic_classes_file: null
+viz_semantic_gt_2d: false
+semantic_2d_palette_path: null
+skip_existing_semantic_gt_2d: false
+
+############### hyperparams #################
+check_visibility: false
+# use topk views with visiblity of object vertices
+visibility_topk: 3
+# min size of the bbox of an object (each side must be greater than this in pixels)
+bbox_min_side_pix: 50
+# subsample images 
+subsample_factor: 20
+# atleast this fraction of the object's vertices should be visible in the image
+# set to 0 to ignore threshold
+obj_visible_thresh: 0.1
+# object should cover atleast this fraction of the image's pixels
+# set to 0 to ignore threshold
+obj_pixel_thresh: 0.00
+# object should be within this distance from the camera (meters) (set large number to include all objects)
+obj_dist_thresh: 999
+# expand the bbox by this fraction in each direction
+bbox_expand_factor: 0.1
+
+############### output #################
+save_dir_root: 
+save_dir: 
+
+############### dbg #################
+dbg:
+  # viz obj ids in 2d for each image
+  viz_obj_ids: true

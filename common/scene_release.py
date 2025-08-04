@@ -113,6 +113,14 @@ class ScannetppScene_Release:
         return self.dslr_dir / 'original_anon_masks'
     
     @property
+    def dslr_resized_undistorted_dir(self):
+        return self.dslr_dir / 'resized_undistorted_images'
+    
+    @property
+    def dslr_resized_undistorted_mask_dir(self):
+        return self.dslr_dir / 'resized_undistorted_masks'
+    
+    @property
     def dslr_colmap_dir(self):
         return self.dslr_dir / 'colmap'
     
@@ -122,6 +130,10 @@ class ScannetppScene_Release:
 
     @property
     def dslr_nerfstudio_undistorted_transform_path(self):
+        return self.dslr_dir / 'nerfstudio' / 'transforms_undistorted.json'
+    
+    @property
+    def dslr_nerfstudio_transform_undistorted_path(self):
         return self.dslr_dir / 'nerfstudio' / 'transforms_undistorted.json'
     
     @property
@@ -135,7 +147,7 @@ class ScannetppScene_Release:
     
     @property
     def iphone_video_path(self):
-        return self.iphone_data_dir / 'rgb.mp4'
+        return self.iphone_data_dir / 'rgb.mkv'
     
     @property
     def iphone_rgb_dir(self):
