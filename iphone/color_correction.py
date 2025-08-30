@@ -20,6 +20,15 @@ from iphone.color_correction_utils import get_concat_h, ColorCorrector, ALL_PIXE
 SUPPORT_IMAGE_FORMAT = [".JPG", ".jpg", ".png", ".PNG", ".jpeg"]
 
 
+def save_array_to_image(
+    array: np.ndarray,
+    save_path: Union[str, Path],
+):
+    array = np.clip(array * 255.0, 0, 255).astype(np.uint8)
+    image = Image.fromarray(array)
+    image.save(save_path)
+
+
 def color_correction(
     pred_dir: Union[str, Path],
     gt_dir: Union[str, Path],
@@ -29,14 +38,8 @@ def color_correction(
     scene_id: str = "unknown",
     verbose: bool = True,
     gt_file_format: str = ".JPG",
-    device: str = "cpu",
     cc_configs: dict = None,
 ):
-
-    print(pred_dir)
-    print(gt_dir)
-    print(output_dir)
-    print(image_list)
     """
     Apply color correction to predicted images.
 
@@ -49,7 +52,6 @@ def color_correction(
         scene_id: Scene ID for logging.
         verbose: Print the evaluation results.
         gt_file_format: File format of the GT images.
-        device: Device to use for computation.
         cc_configs: Color correction configuration dictionary.
 
     Process:
@@ -121,8 +123,7 @@ def color_correction(
             mask_path = os.path.join(mask_dir, image_name + ".png")
             assert os.path.exists(mask_path), f"mask not found: {mask_path}"
             mask = Image.open(mask_path)
-            mask = torch.from_numpy(np.array(mask)).to(device)
-            mask = (mask > 0).bool()
+            mask = np.array(mask) > 0
             assert (
                 len(mask.shape) == 2
             ), f"mask should have 2 channels (H, W) but get shape: {mask.shape}"
@@ -137,36 +138,14 @@ def color_correction(
             pred_image = pred_image.resize(gt_image.size, Image.BICUBIC)
 
         gt_image = np.array(gt_image) / 255.0
-        # gt_image = gt_image.to(device)
         pred_image = np.array(pred_image) / 255.0
-        # pred_image = pred_image.to(device)
-        image_shape = gt_image.shape
-
         assert len(gt_image.shape) == 3, f"GT image should have 3 channels (H, W, 3) but get shape: {gt_image.shape}"
         assert len(pred_image.shape) == 3, f"pred image should have 3 channels (H, W, 3) but get shape: {pred_image.shape}"
-        gt_image = gt_image.transpose(2, 0, 1)
-        pred_image = pred_image.transpose(2, 0, 1)
 
-        # If the mask is given and not all pixels are valid
-        if mask is not None and not torch.all(mask):
-            valid_gt = gt_image[:, mask]
-            valid_pred = pred_image[:, mask]
-        else:
-            valid_gt = gt_image.reshape(3, -1)
-            valid_pred = pred_image.reshape(3, -1)
-        num_samples = valid_gt.shape[1]
-
-        # print("==" * 10 + f"{_id}, {image_name}, {scene_id}" + "==" * 10)
-        # print("gt: ", valid_gt.shape, gt_image_path)
-        # print("pred: ", valid_pred.shape, pred_image_path)
-        # if mask is not None and not torch.all(mask):
-        #     print("mask: ", mask.shape, mask_path)
-        # else:
-        #     print("mask: not available")
-
+        image_shape = gt_image.shape
         # Initialize color_corrector
+        num_samples = gt_image[0] * gt_image[1]
         color_corrector = ColorCorrector(
-            image_shape=image_shape,
             method=cc_configs["method"],
             option=cc_configs["option"],
             batch_size=cc_configs["batch_size"],
@@ -175,86 +154,28 @@ def color_correction(
             mode=cc_configs["mode"],
         )
 
-        # Prepare for color_correction
-        (
-            train_Xs,
-            train_Xt,
-            eval_Xs,
-            eval_Xt,
-            eval_masks,
-            eval_path2Is,
-            eval_path2It,
-            _,
-        ) = color_corrector.preparation(
-            train_images_path_list=[pred_image_path],
-            train_gt_path_list=[gt_image_path],
-            train_masks_path_list=[mask_path],
-            eval_images_path_list=[pred_image_path],
-            eval_gt_path_list=[gt_image_path],
-            eval_masks_path_list=[mask_path],
-            sample_every=ALL_PIXELS // cc_configs["sample_size"],
+        color_corrector.prepare_and_fit(
+            train_images_source=[pred_image],
+            train_images_target=[gt_image],
+            train_image_masks=[mask],
             paired=True,
-            offset=0,
-            mode=cc_configs["mode"],
-            train_batch_size=cc_configs["batch_size"],
-            eval_batch_size=cc_configs["batch_size"],
-            downsample=-1
+            sample_every=1,
         )
 
-        # Color correction operator estimation
-        color_corrector(Xs=train_Xs, Xt=train_Xt)
-
-        # Apply color_correction
-        transformed_Xs = color_corrector.transform_and_result(
-            eval_Xs=eval_Xs,
-            eval_Xt=eval_Xt,
-            eval_masks=eval_masks,
-            # eval_batch_size=cc_configs["batch_size"],
+        pred_image_cc = color_corrector.transform_and_result(
+            image_source=pred_image,
+            image_target=gt_image,
+            image_mask=mask,
         )
 
-        transform_x = transformed_Xs[0]
-        # post process
-        eval_source_image_path = eval_path2Is[0]
-        path_dict["pred"].append(str(eval_source_image_path))
-        eval_target_image_path = eval_path2It[0]
-        path_dict["gt"].append(str(eval_target_image_path))
+        if verbose:
+            l2_loss_before = np.linalg.norm(pred_image.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
+            l2_loss_after = np.linalg.norm(pred_image_cc.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
+            print(f"Before CC L2 loss: {l2_loss_before:.03}, After CC L2 loss: {l2_loss_after:.03}")
+            # diff = np.linalg.norm(pred_image.reshape(-1, 3) - pred_image_cc.reshape(-1, 3), axis=1).mean()
+            # print(f"Diff (before/after): {diff:.03}")
 
-        print("eval source (test DSLR): ", eval_source_image_path)
-        print("eval target (test DSLR): ", eval_target_image_path)
-
-        im1 = Image.open(eval_source_image_path).convert("RGB")
-        im2 = Image.open(eval_target_image_path).convert("RGB")
-        im3 = Image.fromarray(transform_x).convert("RGB")
-
-        npim1 = np.asarray(im1).astype(np.uint8)
-        npim2 = np.asarray(im2).astype(np.uint8)
-        npim3 = np.asarray(im3).astype(np.uint8)
-        print("transformed x: ", npim3.shape)
-
-        if npim1.shape != npim2.shape:
-            im1 = Image.fromarray(np.array(Image.fromarray(npim1).resize((npim2.shape[1], npim2.shape[0]))).astype(np.uint8)).convert("RGB")
-
-        # save dir of color corrected img
-        iphone_fname = Path(eval_source_image_path).stem
-        nn_dslr_fname = Path(eval_target_image_path).stem
-        assert iphone_fname == nn_dslr_fname
-
-        print(collection_dir / Path(eval_source_image_path).name)
-        cc_source_path = collection_dir / Path(eval_source_image_path).name
-        path_dict["cc_pred"].append(str(cc_source_path))
-
-        print("path_dict[pred]: ", path_dict["pred"])
-        print("path_dict[cc_pred]: ", path_dict["cc_pred"])
-
-        # save the color_corrected_pred -> pred_after_cc_dir
-        im3.save(os.path.join(pred_after_cc_dir, Path(eval_source_image_path).name))
-
-        # save the pair (before/after) -> collection_dir
-        save_im_path = os.path.join(collection_dir, iphone_fname + ".png")
-        concat_im = get_concat_h(im1=im1, im2=im3)
-        concat_im.save(save_im_path)
-
-    return path_dict
+        save_array_to_image(pred_image_cc, output_dir / f"{image_name}.png")
 
 
 def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=True):
@@ -271,7 +192,6 @@ def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=Tr
     Returns:
         dict: Dictionary mapping scene IDs to path dictionaries
     """
-    path_dicts = {str(scene_id): None for scene_id in scene_list}
     for i, scene_id in enumerate(scene_list):
         if verbose:
             print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
@@ -295,7 +215,7 @@ def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=Tr
                 print(f"Scene {scene_id} has masks. Using masks for color correction.")
         mask_dir = scene.dslr_resized_mask_dir  # change to the DSLR_undistorted_iphone mask dir
 
-        path_dict = color_correction(
+        color_correction(
             pred_dir=Path(pred_dir) / scene_id,
             gt_dir=scene.dslr_resized_dir,  # change to the DSLR_undistorted_iphone dir
             output_dir=Path(output_dir) / scene_id,
@@ -304,12 +224,6 @@ def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=Tr
             scene_id=scene_id,
             verbose=verbose,
         )
-
-        path_dicts[scene_id] = path_dict
-
-    return path_dicts
-
-
 
 
 def main(args):
@@ -320,28 +234,22 @@ def main(args):
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes if len(x.strip()) > 0]
 
+    all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
+        args.data_root, args.pred_dir, val_scenes, args.device
+    )
+
     color_correction_all(
         data_root=args.data_root,
         pred_dir=args.pred_dir,
         output_dir=args.output_dir,
         scene_list=val_scenes,
-        verbose=True,
+        verbose=False,
     )
 
-    print(val_scenes)
-    # if args.device == "cuda" and not torch.cuda.is_available():
-    #     args.device = "cpu"
-    # all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
-    #     args.data_root, args.pred_dir, val_scenes, args.device
-    # )
-
-
-
-# if __name__ == "__main__":
-#     data_root = ""
-#     pred_dir = ""
-#     scene_list = []
-#     upload_path = ""
+    print("After color correction:")
+    all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
+        args.data_root, args.output_dir, val_scenes, args.device
+    )
 
 
 if __name__ == "__main__":
