@@ -12,3 +12,4 @@ torchvision==0.14.1+cu116
 torchmetrics==1.2.0
 scipy
 open3d
+POT
