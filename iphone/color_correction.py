@@ -1,21 +1,14 @@
-# TODO: Fix the problem when the image has mask (avoid using the masked regions for color correction)
-# TODO: Make it a independent script for evaluation
-# TODO: Remove the hardcoded paths and numbers
-
 import argparse
-from typing import List, Optional, Union
 import os
 from pathlib import Path
-import torch
+from typing import List, Optional, Tuple, Union, Dict
+
 import numpy as np
 from PIL import Image
-import matplotlib.pyplot as plt
-import ot
 
 from common.scene_release import ScannetppScene_Release
-from eval.nvs import get_test_images, scene_has_mask
-from eval.nvs import evaluate_all
-from iphone.color_correction_utils import get_concat_h, ColorCorrector, ALL_PIXELS
+from eval.nvs import evaluate_all, get_test_images, scene_has_mask
+from iphone.color_correction_utils import ColorCorrector
 
 SUPPORT_IMAGE_FORMAT = [".JPG", ".jpg", ".png", ".PNG", ".jpeg"]
 
@@ -38,21 +31,19 @@ def color_correction(
     scene_id: str = "unknown",
     verbose: bool = True,
     gt_file_format: str = ".JPG",
-    cc_configs: dict = None,
-):
+) -> Tuple[List[str], List[str]]:
     """
     Apply color correction to predicted images.
 
     Args:
         pred_dir: Path to the directory containing the predicted images.
         gt_dir: Path to the directory containing the GT images.
+        output_dir: Path to the directory to save color-corrected images.
         image_list: List of image names to evaluate.
-        upload_path: Path to upload directory.
         mask_dir: Path to the directory containing the masks. Evaluate without mask if None.
         scene_id: Scene ID for logging.
         verbose: Print the evaluation results.
         gt_file_format: File format of the GT images.
-        cc_configs: Color correction configuration dictionary.
 
     Process:
         1. Load pair of image/target
@@ -62,50 +53,18 @@ def color_correction(
         5. Add the path2images_after_cc
 
     Returns:
-        dict: Dictionary containing paths to original, GT, and color-corrected images.
+        The lists of path of original predicted images and color-corrected images.
     """
-    if cc_configs is None:
-        cc_configs = {
-            "method": "default",
-            "option": "LinearTransport",
-            "sample_size": 2764800,
-            "batch_size": 1,
-            "mode": "server"
-        }
-
-    # pred_after_cc_dir = Path(output_dir) / "after"
-    # if not os.path.exists(pred_after_cc_dir):
-    #     os.makedirs(pred_after_cc_dir)
-
-    # pred_after_cc_dir = Path(pred_after_cc_dir) / scene_id
-    # if not os.path.exists(pred_after_cc_dir):
-    #     os.makedirs(pred_after_cc_dir)
-
-    # # Path to pairs (before/after)
-    # collection_dir = Path(upload_path) / "color_corrected_BA"
-    # if not os.path.exists(collection_dir):
-    #     os.makedirs(collection_dir)
-
-    # collection_dir = Path(collection_dir) / scene_id
-    # if not os.path.exists(collection_dir):
-    #     os.makedirs(collection_dir)
-
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Copy color correction config
-    # with open(os.path.join(collection_dir, "cc_config.txt"), "w") as config_f:
-    #     config_f.write(str(cc_configs))
-
-    color_corrector = None
-    path_dict = {"pred": [], "gt": [], "cc_pred": []}
+    image_pred_path_list = []
+    image_cc_path_list = []
 
     for image_idx, image_fn in enumerate(image_list):
         image_name = image_fn.split(".")[0]
         gt_image_path = os.path.join(gt_dir, image_name + gt_file_format)
-        assert os.path.exists(
-            gt_image_path
-        ), f"{scene_id} GT image not found: {image_fn} given path {gt_image_path}"
+        assert os.path.exists(gt_image_path), f"{scene_id} GT image not found: {image_fn} given path {gt_image_path}"
         gt_image = Image.open(gt_image_path)
 
         pred_image_path = None
@@ -124,9 +83,7 @@ def color_correction(
             assert os.path.exists(mask_path), f"mask not found: {mask_path}"
             mask = Image.open(mask_path)
             mask = np.array(mask) > 0
-            assert (
-                len(mask.shape) == 2
-            ), f"mask should have 2 channels (H, W) but get shape: {mask.shape}"
+            assert len(mask.shape) == 2, f"mask should have 2 channels (H, W) but get shape: {mask.shape}"
             assert (
                 mask.shape[0] == gt_image.size[1] and mask.shape[1] == gt_image.size[0]
             ), f"mask shape {mask.shape} does not match GT image size: {gt_image.size}"
@@ -142,19 +99,9 @@ def color_correction(
         assert len(gt_image.shape) == 3, f"GT image should have 3 channels (H, W, 3) but get shape: {gt_image.shape}"
         assert len(pred_image.shape) == 3, f"pred image should have 3 channels (H, W, 3) but get shape: {pred_image.shape}"
 
-        image_shape = gt_image.shape
         # Initialize color_corrector
-        num_samples = gt_image[0] * gt_image[1]
-        color_corrector = ColorCorrector(
-            method=cc_configs["method"],
-            option=cc_configs["option"],
-            batch_size=cc_configs["batch_size"],
-            # sample_size=cc_configs["sample_size"],
-            sample_size=num_samples,
-            mode=cc_configs["mode"],
-        )
-
-        color_corrector.prepare_and_fit(
+        color_corrector = ColorCorrector("LinearTransport")
+        color_corrector.fit(
             train_images_source=[pred_image],
             train_images_target=[gt_image],
             train_image_masks=[mask],
@@ -162,7 +109,7 @@ def color_correction(
             sample_every=1,
         )
 
-        pred_image_cc = color_corrector.transform_and_result(
+        pred_image_cc = color_corrector.transform(
             image_source=pred_image,
             image_target=gt_image,
             image_mask=mask,
@@ -177,21 +124,33 @@ def color_correction(
 
         save_array_to_image(pred_image_cc, output_dir / f"{image_name}.png")
 
+        image_pred_path_list.append(str(pred_image_path))
+        image_cc_path_list.append(str(output_dir / f"{image_name}.png"))
+    return image_pred_path_list, image_cc_path_list
 
-def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=True):
+
+def color_correction_all(
+    data_root: Union[str, Path],
+    pred_dir: Union[str, Path],
+    output_dir: Union[str, Path],
+    scene_list: List[str],
+    verbose: bool = True,
+) -> Dict[str, Tuple[List[str], List[str]]]:
     """
     Apply color correction to all scenes in the scene list.
 
     Args:
         data_root: Root directory containing scene data
         pred_dir: Directory containing predicted images
+        output_dir: Directory to save color-corrected images
         scene_list: List of scene IDs to process
-        upload_path: Path to upload directory
         verbose: Whether to print progress information
 
     Returns:
-        dict: Dictionary mapping scene IDs to path dictionaries
+        Dictionary of scene_id to (pred_path_list, cc_path_list)
     """
+
+    output_dict = {}
     for i, scene_id in enumerate(scene_list):
         if verbose:
             print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
@@ -215,7 +174,7 @@ def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=Tr
                 print(f"Scene {scene_id} has masks. Using masks for color correction.")
         mask_dir = scene.dslr_resized_mask_dir  # change to the DSLR_undistorted_iphone mask dir
 
-        color_correction(
+        pred_path_list, cc_path_list = color_correction(
             pred_dir=Path(pred_dir) / scene_id,
             gt_dir=scene.dslr_resized_dir,  # change to the DSLR_undistorted_iphone dir
             output_dir=Path(output_dir) / scene_id,
@@ -224,6 +183,9 @@ def color_correction_all(data_root, pred_dir, output_dir, scene_list, verbose=Tr
             scene_id=scene_id,
             verbose=verbose,
         )
+
+        output_dict[scene_id] = (pred_path_list, cc_path_list)
+    return output_dict
 
 
 def main(args):
@@ -234,11 +196,10 @@ def main(args):
             val_scenes = f.readlines()
             val_scenes = [x.strip() for x in val_scenes if len(x.strip()) > 0]
 
-    all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
-        args.data_root, args.pred_dir, val_scenes, args.device
-    )
+    print("Before color correction:")
+    evaluate_all(args.data_root, args.pred_dir, val_scenes, args.device, verbose=True)
 
-    color_correction_all(
+    output_dict = color_correction_all(
         data_root=args.data_root,
         pred_dir=args.pred_dir,
         output_dir=args.output_dir,
@@ -247,9 +208,7 @@ def main(args):
     )
 
     print("After color correction:")
-    all_images, all_psnr, all_ssim, all_lpips = evaluate_all(
-        args.data_root, args.output_dir, val_scenes, args.device
-    )
+    evaluate_all(args.data_root, args.output_dir, val_scenes, args.device, verbose=True)
 
 
 if __name__ == "__main__":
