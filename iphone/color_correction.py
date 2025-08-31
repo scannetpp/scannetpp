@@ -47,10 +47,8 @@ def color_correction(
 
     Process:
         1. Load pair of image/target
-        2. Estimate optimal transport operator
-        3. Apply operator on image/Save it in path2images_after_cc
-        4. Create side-by-side dir/Save it
-        5. Add the path2images_after_cc
+        2. Estimate optimal transport (OT)
+        3. Apply the OT on image and save them
 
     Returns:
         The lists of path of original predicted images and color-corrected images.
