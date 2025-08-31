@@ -118,7 +118,11 @@ def color_correction(
         if verbose:
             l2_loss_before = np.linalg.norm(pred_image.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
             l2_loss_after = np.linalg.norm(pred_image_cc.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
-            print(f"Before CC L2 loss: {l2_loss_before:.03}, After CC L2 loss: {l2_loss_after:.03}")
+            print(
+                f"[{scene_id}] Image: {image_name}\n"
+                f"    L2 Loss Before CC: {l2_loss_before:.4f}\n"
+                f"    L2 Loss After  CC: {l2_loss_after:.4f}\n"
+            )
             # diff = np.linalg.norm(pred_image.reshape(-1, 3) - pred_image_cc.reshape(-1, 3), axis=1).mean()
             # print(f"Diff (before/after): {diff:.03}")
 
@@ -204,7 +208,7 @@ def main(args):
         pred_dir=args.pred_dir,
         output_dir=args.output_dir,
         scene_list=val_scenes,
-        verbose=False,
+        verbose=True,
     )
 
     print("After color correction:")
