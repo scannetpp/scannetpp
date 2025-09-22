@@ -15,7 +15,6 @@ Contents
 * [DSLR](#dslr)
     * [Undistortion: convert fisheye images to pinhole with OpenCV](#undistortion-convert-fisheye-images-to-pinhole-with-opencv)
     * [Downscale the DSLR images](#downscale-the-dslr-images)
-    * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
     * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
 * [iPhone](#iphone)
     * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
@@ -267,7 +266,7 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 | SpUNet     | 0.478         | 0.723         | 0.456          | 0.683          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h87z3y4v) |
 | PTv2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
 
-**Notes:**   
+**Notes:**
 - All **Model Checkpoints** will be released soon.
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
 - Configuration files can be found on Pointcept ScanNet++ [Configurations](https://github.com/Pointcept/Pointcept/tree/main/configs/scannetpp), e.g. [Validation](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-0-base.py), [Test Submission](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-1-submit.py).
@@ -284,7 +283,7 @@ This table presents the AP50 results for different models on validation and test
 | SPFormer-Pretrained Scannet    | 0.419      | 0.432      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/x7jrzcxy)|
 | PointGroup                     | 0.147      | 0.152      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/4u5o6paj)|
 
-**Notes:**   
+**Notes:**
 - All **Model Checkpoints** will be released soon.
 - Implementation code and configuration code will be released soon  (Now in open PRs on pointcept  [Pointcept](https://github.com/Pointcept/Pointcept).
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).
