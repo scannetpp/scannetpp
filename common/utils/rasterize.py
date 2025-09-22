@@ -24,6 +24,9 @@ def undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2):
     pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
         interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
     )
+    if torch.is_tensor(zbuf):
+        # convert to np array
+        zbuf = zbuf.cpu().numpy()
     # zbuf is tensor
     zbuf = torch.Tensor(cv2.remap(zbuf, undistort_map1, undistort_map2,
         interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
@@ -145,7 +148,7 @@ def get_fisheye_cameras_batch(poses, img_width, img_height, intrinsic_mat, disto
     # negate z back
     fisheye_T[:, -1] *= -1
 
-    radial_params_repeat = torch.Tensor([distort_params]) #.expand(bsize, -1)
+    radial_params_repeat = torch.Tensor(np.array([distort_params])) #.expand(bsize, -1)
 
     # focal, center, radial_params, R, T, use_radial
     fisheye_cameras = fisheyecameras.FishEyeCameras(
@@ -185,6 +188,7 @@ def rasterize_mesh(meshes, img_height, img_width, cameras):
         'zbuf': raster_out.zbuf.cpu(),
         'bary_coords': raster_out.bary_coords.cpu(),
         'dists': raster_out.dists.cpu(),
+        'fragments': raster_out # everything
     }
 
     return raster_out_dict

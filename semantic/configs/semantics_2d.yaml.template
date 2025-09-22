@@ -11,8 +11,15 @@ image_type: dslr
 undistort_dslr: true
 create_visiblity_cache_only: false
 
+############## other data filters ##########
+# names of images to process - if specified, ignore subsample_factor
+filter_images: []
+
 ########## tasks/data to be created ##########
+process_each_object: false
+save_undistorted_images: true
 save_semantic_gt_2d: false
+save_objid_gt_2d: true
 semantic_classes_file: null
 viz_semantic_gt_2d: false
 semantic_2d_palette_path: null
