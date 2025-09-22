@@ -93,25 +93,33 @@ The rendered depth maps are single-channel uint16 png, where the unit is mm and 
 python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ```
 
-### NEW!!
+### [NEW] IPhone NVS Benchmark using DSLR as GT with Color-Correction
 
-- After your submission for iPhone NVS track on our bechmark, we evaluate them before/after color-correction.
-- Since GTs for this task is taken by DSLR, you first need to undistort DSLR test frames by iPhone intrinsic in order to use them as a test frames for a training.
-- After a training, you will render a test frame given a DSLR test pose with iPhone intrinsic.
-- Due to the inconsistent lighting of iPhone compared to our DSLR, we introduced color-correction as a post-processing on our benchmark server.
-- Hence, the evaluation on the benchmark server will also be held after color-corrections.
-- The identical color-correction method used for our post-processing is now available on this toolkit.
-- Additional details can be found on the page: "Novel View Synthesis on iPhone Images" on our benchmark website.
+To try out our new iPhone NVS benchmark, please follow the steps below:
+- Use the official scripts to decode the iPhone video into images (and depth maps).
+- Train your NVS method!
+- Render the poses from the DSLR test frames with iPhone intrinsic.
+- Prepare the DSLR GT by undistorting the DSLR images with iPhone intrinsic using the provided script.
+- Evaluation with color-correction using the provided script.
 
-### Undistortion of DSLR (Ground Truth for iPhone NVS) given iPhone intrinsic
+#### Undistort DSLR images with iPhone intrinsic
+Adjust the `folder_name` and `scene_ids` in `dslr/configs/undistort_given_intrinsics.yml` and run
+
 ```
-python -m ??
+python -m dslr.undistort_given_intrinsics dslr/configs/undistort_given_intrinsics.yml
 ```
 
-### Color-correction after NVS
+
+#### Evaluation with color-correction
+
+Run the following:
 ```
-python -m ??
+python -m iphone.color_correction --data_root DATA_ROOT --split SPLIT_FILE --pred_dir PRED_DIR --output_dir OUTPUT_DIR --device [cuda|cpu]
 ```
+where `PRED_DIR` is the directory containing your rendered images, and `OUTPUT_DIR` is where color-corrected images will be saved during the evaluation.
+
+NOTE: if you just updated this repo, please make sure that you install the [POT library](https://pythonot.github.io/index.html) in using the updated `requirements.txt`.
+
 
 ## Semantics
 
