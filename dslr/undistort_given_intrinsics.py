@@ -14,23 +14,6 @@ from common.scene_release import ScannetppScene_Release
 from common.utils.utils import load_yaml_munch, load_json, read_txt_list
 
 
-def compute_undistort_intrinsic(K, height, width, distortion_params):
-    assert len(distortion_params.shape) == 1
-    assert distortion_params.shape[0] == 4  # OPENCV_FISHEYE has k1, k2, k3, k4
-
-    new_K = cv2.fisheye.estimateNewCameraMatrixForUndistortRectify(
-        K,
-        distortion_params,
-        (width, height),
-        np.eye(3),
-        balance=0.0,
-    )
-    # Make the cx and cy to be the center of the image
-    new_K[0, 2] = width / 2.0
-    new_K[1, 2] = height / 2.0
-    return new_K
-
-
 def undistort_frames(
     frames,
     K,
@@ -50,7 +33,7 @@ def undistort_frames(
         width: iphone image width
         distortion_params: iphone OPENCV model distortion param: [k1, k2, p1, p2]
     """
-    
+
     # OPENCV
     new_K = K
 
@@ -59,7 +42,7 @@ def undistort_frames(
         dslr_K, dslr_distortion_params, np.eye(3), new_K, (width, height), cv2.CV_32FC1
     )
 
-    # undistort DSLR by given iphone intrinsic *new K which is appropriatedly converted into 
+    # undistort DSLR by given iphone intrinsic *new K which is appropriatedly converted into
     for frame in tqdm(frames, desc="frame"):
         image_path = Path(input_image_dir) / frame["file_path"]
         image = cv2.imread(str(image_path))
@@ -68,7 +51,8 @@ def undistort_frames(
             map1,
             map2,
             interpolation=cv2.INTER_LINEAR,
-            borderMode = cv2.BORDER_CONSTANT, # borderMode=cv2.BORDER_REFLECT_101,
+            # borderMode=cv2.BORDER_REFLECT_101,
+            borderMode=cv2.BORDER_CONSTANT,
         )
         out_image_path = Path(out_image_dir) / frame["file_path"]
         out_image_path.parent.mkdir(parents=True, exist_ok=True)
@@ -127,33 +111,24 @@ def main(args):
             split_path = Path(cfg.data_root) / "splits" / f"{split}.txt"
             scene_ids += read_txt_list(split_path)
 
-    # get the options to process
     # go through each scene
     for scene_id in tqdm(scene_ids, desc='scene'):
         print("scene_id: ", scene_id)
-        scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / 'data')
+        scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / "data")
 
-        # path to save the undistorted DSLR frames by iPhone 
-        output_dir = Path(cfg.data_root) / cfg.folder_name
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir, exist_ok=True)
-        
-        output_scene_dir = os.path.join(output_dir, scene_id)
-        if not os.path.exists(output_scene_dir):
-            os.makedirs(output_scene_dir, exist_ok=True)
-
-        output_dslr_dir = os.path.join(output_scene_dir, "dslr")
+        output_dslr_dir = Path(cfg.data_root) / "data" / scene_id / "dslr_undistorted_by_iphone"
         if not os.path.exists(output_dslr_dir):
             os.makedirs(output_dslr_dir, exist_ok=True)
 
-        output_colmap_dir = None
+        # output_colmap_dir = None
         output_colmap_dir = os.path.join(output_dslr_dir, "colmap")
         if not os.path.exists(output_colmap_dir):
             os.makedirs(output_colmap_dir, exist_ok=True)
 
-        print("output_colmap_dir: ", output_colmap_dir)
         # copy and paste scene.dslr_dir/colmap
-        new_colmap_path = shutil.copytree(os.path.join(scene.dslr_dir, "colmap"), output_colmap_dir, dirs_exist_ok=True)
+        print(f"Copying {scene.dslr_dir}/colmap to {output_colmap_dir}")
+        print("Note that the cameras.txt here are not correct since the images are undistorted.")
+        shutil.copytree(os.path.join(scene.dslr_dir, "colmap"), output_colmap_dir, dirs_exist_ok=True)
 
         out_image_dir = None
         out_mask_dir = None
@@ -212,7 +187,6 @@ def main(args):
                 [0, 0, 1],
             ]
         )
-
 
         d_fx = float(transforms["fl_x"])
         d_fy = float(transforms["fl_y"])
