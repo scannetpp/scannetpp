@@ -5,6 +5,8 @@ from typing import List, Optional, Tuple, Union, Dict
 
 import numpy as np
 from PIL import Image
+import torch
+from torchmetrics.image import PeakSignalNoiseRatio
 
 from common.scene_release import ScannetppScene_Release
 from eval.nvs import evaluate_all, get_test_images, scene_has_mask
@@ -58,6 +60,7 @@ def color_correction(
 
     image_pred_path_list = []
     image_cc_path_list = []
+    psnr_metric = PeakSignalNoiseRatio(data_range=1.0)
 
     for image_idx, image_fn in enumerate(image_list):
         image_name = image_fn.split(".")[0]
@@ -116,10 +119,14 @@ def color_correction(
         if verbose:
             l2_loss_before = np.linalg.norm(pred_image.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
             l2_loss_after = np.linalg.norm(pred_image_cc.reshape(-1, 3) - gt_image.reshape(-1, 3), axis=1).mean()
+            psnr_before = psnr_metric(torch.from_numpy(pred_image).permute(2, 0, 1), torch.from_numpy(gt_image).permute(2, 0, 1)).item()
+            psnr_after = psnr_metric(torch.from_numpy(pred_image_cc).permute(2, 0, 1), torch.from_numpy(gt_image).permute(2, 0, 1)).item()
             print(
                 f"[{scene_id}] Image: {image_name}\n"
                 f"    L2 Loss Before CC: {l2_loss_before:.4f}\n"
                 f"    L2 Loss After  CC: {l2_loss_after:.4f}\n"
+                f"    PSNR Before CC: {psnr_before:.4f}\n"
+                f"    PSNR After  CC: {psnr_after:.4f}\n"
             )
             # diff = np.linalg.norm(pred_image.reshape(-1, 3) - pred_image_cc.reshape(-1, 3), axis=1).mean()
             # print(f"Diff (before/after): {diff:.03}")
@@ -163,7 +170,8 @@ def color_correction_all(
         num_images_pred = len(os.listdir(Path(pred_dir) / scene_id))
         assert num_images_pred > 0, f"Prediction dir of scene {scene_id} is empty"
 
-        scene = ScannetppScene_Release(scene_id, data_root=data_root)
+        # Here we assume the GT images are stored in the data_root / scene_id / "dslr_undistorted_by_iphone" and not "dslr"
+        scene = ScannetppScene_Release(scene_id, data_root=data_root, dslr_folder_name="dslr_undistorted_by_iphone")
 
         # Get the list of test image names: "e.g., DSC09999.JPG"
         # but we need to refer the specific folder which contains DSLR after undistortion by iPhone intrinsic
@@ -174,11 +182,11 @@ def color_correction_all(
             mask_dir = scene.dslr_resized_mask_dir
             if verbose:
                 print(f"Scene {scene_id} has masks. Using masks for color correction.")
-        mask_dir = scene.dslr_resized_mask_dir  # change to the DSLR_undistorted_iphone mask dir
+        mask_dir = scene.dslr_resized_mask_dir
 
         pred_path_list, cc_path_list = color_correction(
             pred_dir=Path(pred_dir) / scene_id,
-            gt_dir=scene.dslr_resized_dir,  # change to the DSLR_undistorted_iphone dir
+            gt_dir=scene.dslr_resized_dir,
             output_dir=Path(output_dir) / scene_id,
             image_list=image_list,
             mask_dir=mask_dir,
