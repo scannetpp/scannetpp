@@ -30,6 +30,7 @@ Contents
     * [Select images with best coverage](#select-images-with-best-coverage)
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+    * [Novel View Synthesis Evaluation (iPhone)](#novel-view-synthesis-evaluation-iphone)
 * [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
@@ -232,12 +233,12 @@ SCENE_ID1/
 NOTE:
 The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
 
-### [New🔥] Novel View Synthesis Evaluation (iPhone)
-To submit to the benchmark server, it's similar to the DSLR submission: render novel views defined in the "test_frames" in `iphone/nerfstudio/transforms.json` and submit the rendered images to the benchmark server following the same structure as above. The evaluation differs in that it contains a color-correction step to account for the color difference between the iPhone and DSLR images (see `eval/nvs_iphone.py`).
+### Novel View Synthesis Evaluation (iPhone)
+To submit to the benchmark server, it's similar to the DSLR submission: render novel views defined in the `test_frames` in `iphone/nerfstudio/transforms.json` and submit the rendered images to the benchmark server following the same structure as above. The evaluation differs in that it contains a color-correction step to account for the color difference between the iPhone and DSLR images (see `eval/nvs_iphone.py`).
 
 To run the evaluation locally for scenes other than `nvs_test_iphone` sets, it contains a few steps:
 1. Decode the iPhone video into images (and depth maps) using the official scripts.
-2. Undistort the DSLR test frames using iPhone intrinsic.
+2. Undistort the DSLR test frames using iPhone intrinsic. They are the ground-truth images for evaluation.
 3. Train your NVS method!
 4. Render the poses from the DSLR test frames with iPhone intrinsic.
 5. Evaluate the rendered images with color-correction.
