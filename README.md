@@ -15,7 +15,6 @@ Contents
 * [DSLR](#dslr)
     * [Undistortion: convert fisheye images to pinhole with OpenCV](#undistortion-convert-fisheye-images-to-pinhole-with-opencv)
     * [Downscale the DSLR images](#downscale-the-dslr-images)
-    * [Undistortion: convert fisheye images to pinhole with COLMAP](#undistortion-convert-fisheye-images-to-pinhole-with-colmap)
     * [Render Depth for DSLR and iPhone](#render-depth-for-dslr-and-iphone)
 * [iPhone](#iphone)
     * [Extract RGB frames, masks and depth frames](#extract-rgb-frames-masks-and-depth-frames)
@@ -31,6 +30,7 @@ Contents
     * [Select images with best coverage](#select-images-with-best-coverage)
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
+    * [Novel View Synthesis Evaluation (iPhone)](#novel-view-synthesis-evaluation-iphone)
 * [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
@@ -93,7 +93,6 @@ The rendered depth maps are single-channel uint16 png, where the unit is mm and 
 ```
 python -m iphone.prepare_iphone_data iphone/configs/prepare_iphone_data.yml
 ```
-
 
 ## Semantics
 
@@ -234,6 +233,39 @@ SCENE_ID1/
 NOTE:
 The evaluation script here is the same that runs on the benchmark server. Therefore, it's highly encouraged to run the evaluation script before submitting the results (on the val set) to the benchmark server.
 
+### Novel View Synthesis Evaluation (iPhone)
+To submit to the benchmark server, it's similar to the DSLR submission: render novel views defined in the `test_frames` in `iphone/nerfstudio/transforms.json` and submit the rendered images to the benchmark server following the same structure as above. The evaluation differs in that it contains a color-correction step to account for the color difference between the iPhone and DSLR images (see `eval/nvs_iphone.py`).
+
+To run the evaluation locally for scenes other than `nvs_test_iphone` sets, it contains a few steps:
+1. Decode the iPhone video into images (and depth maps) using the official scripts.
+2. Undistort the DSLR test frames using iPhone intrinsic. They are the ground-truth images for evaluation.
+3. Train your NVS method!
+4. Render the poses from the DSLR test frames with iPhone intrinsic.
+5. Evaluate the rendered images with color-correction.
+
+The details and the scripts are described below.
+
+#### Undistort DSLR images with iPhone intrinsic
+Adjust the `folder_name` and `scene_ids` or `splits` in `dslr/configs/undistort_given_intrinsics.yml` and run
+```
+python -m dslr.undistort_given_intrinsics dslr/configs/undistort_given_intrinsics.yml
+```
+The undistorted images will be saved in `<DATA_ROOT>/<SCENE_ID>/dslr_undistorted_by_iphone/`
+
+
+#### Evaluation with color-correction
+
+TLDR; run the following:
+```
+python -m eval.nvs --data_root DATA_ROOT --split SPLIT_FILE --pred_dir PRED_DIR --output_dir OUTPUT_DIR
+```
+where `PRED_DIR` is the directory containing your rendered images, and `OUTPUT_DIR` is where color-corrected images will be saved during the evaluation.
+
+NOTE: if you just updated this repo, please make sure that you install the [POT library](https://pythonot.github.io/index.html) by using the updated `requirements.txt`.
+
+The color correction process is defined in `iphone/color_correction.py`. It computes the optimal transport between the color distribution of the rendered images and the ground-truth DSLR images. The color-corrected images will be saved in `OUTPUT_DIR/<SCENE_ID>/` during the evaluation.
+
+
 ## Benchmarks
 ### Semantic Segmentation
 
@@ -248,7 +280,7 @@ This table presents the **Top-1 IoU** and **Top-3 IoU** results for different mo
 | SpUNet     | 0.478         | 0.723         | 0.456          | 0.683          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/h87z3y4v) |
 | PTv2       | 0.466         | 0.741         | 0.445          | 0.688          | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/nbcyphpg) |
 
-**Notes:**   
+**Notes:**
 - All **Model Checkpoints** will be released soon.
 - Implementation code can be found on [Pointcept](https://github.com/Pointcept/Pointcept).
 - Configuration files can be found on Pointcept ScanNet++ [Configurations](https://github.com/Pointcept/Pointcept/tree/main/configs/scannetpp), e.g. [Validation](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-0-base.py), [Test Submission](https://github.com/Pointcept/Pointcept/blob/main/configs/scannetpp/semseg-pt-v3m1-1-submit.py).
@@ -265,7 +297,7 @@ This table presents the AP50 results for different models on validation and test
 | SPFormer-Pretrained Scannet    | 0.419      | 0.432      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/x7jrzcxy)|
 | PointGroup                     | 0.147      | 0.152      | TBA        | [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/4u5o6paj)|
 
-**Notes:**   
+**Notes:**
 - All **Model Checkpoints** will be released soon.
 - Implementation code and configuration code will be released soon  (Now in open PRs on pointcept  [Pointcept](https://github.com/Pointcept/Pointcept).
 - A compiled report for all methods can be found on [Wandb](https://api.wandb.ai/links/streakfull-technical-university-of-munich/297rt3f4).

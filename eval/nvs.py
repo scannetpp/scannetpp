@@ -61,6 +61,7 @@ def evaluate_scene(
     for image_fn in image_list:
         image_name = image_fn.split(".")[0]
         gt_image_path = os.path.join(gt_dir, image_name + gt_file_format)
+
         assert os.path.exists(
             gt_image_path
         ), f"{scene_id} GT image not found: {image_fn}"
@@ -158,7 +159,14 @@ def scene_has_mask(transforms_path: str):
     return transforms["has_mask"]
 
 
-def evaluate_all(data_root, pred_dir, scene_list, device="cpu", verbose=True):
+def evaluate_all(
+    data_root,
+    pred_dir,
+    scene_list,
+    device="cpu",
+    verbose=True,
+    custom_dslr_folder_name=None,
+):
     all_images = []
     all_psnr = []
     all_ssim = []
@@ -170,8 +178,8 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu", verbose=True):
         ).exists(), f"Prediction dir of scene {scene_id} does not exist"
         num_images_pred = len(os.listdir(Path(pred_dir) / scene_id))
         assert num_images_pred > 0, f"Prediction dir of scene {scene_id} is empty"
-        scene = ScannetppScene_Release(scene_id, data_root=data_root)
-        image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
+        # scene = ScannetppScene_Release(scene_id, data_root=data_root, dslr_folder_name=custom_dslr_folder_name)
+        # image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
 
         # assert num_images_pred == len(
         #     image_list
@@ -184,15 +192,17 @@ def evaluate_all(data_root, pred_dir, scene_list, device="cpu", verbose=True):
     for i, scene_id in enumerate(scene_list):
         if verbose:
             print(f"({i+1} / {len(scene_list)}) scene_id: {scene_id}")
-        scene = ScannetppScene_Release(scene_id, data_root=data_root)
+        scene = ScannetppScene_Release(scene_id, data_root=data_root, dslr_folder_name=custom_dslr_folder_name)
         image_list = get_test_images(scene.dslr_nerfstudio_transform_path)
 
         mask_dir = None
         if scene_has_mask(scene.dslr_nerfstudio_transform_path):
             mask_dir = scene.dslr_resized_mask_dir
+
+        scene_gt_dir = scene.dslr_resized_dir
         scene_psnr, scene_ssim, scene_lpips = evaluate_scene(
             Path(pred_dir) / scene_id,
-            scene.dslr_resized_dir,
+            scene_gt_dir,
             image_list,
             mask_dir,
             auto_resize=True,
