@@ -38,7 +38,9 @@ class ScannetppScene_Release:
     def scene_root_dir(self):
         return self.data_root / self._scene_id
 
-    ##### scan assets #####
+    ##########################################################
+    # Scan assets
+    ##########################################################
     @property
     def scans_dir(self):
         '''
@@ -109,7 +111,55 @@ class ScannetppScene_Release:
     def scan_sem_mesh_path(self):
         return self.mesh_dir / f'mesh_aligned_0.05_semantic.ply'
 
-    ######## DSLR ########
+    ##########################################################
+    # Panocam assets
+    ##########################################################
+    @property
+    def pano_dir(self):
+        return self.data_root / self._scene_id / 'panocam'
+
+    @property
+    def pano_rgb_dir(self):
+        return self.pano_dir / 'images'
+
+    @property
+    def pano_anon_mask_dir(self):
+        return self.pano_dir / 'anon_mask'
+
+    @property
+    def pano_depth_dir(self):
+        return self.pano_dir / 'depth'
+
+    @property
+    def pano_azim_dir(self):
+        return self.pano_dir / 'azim'
+
+    @property
+    def pano_elev_dir(self):
+        return self.pano_dir / 'elev'
+
+    @property
+    def pano_resized_rgb_dir(self):
+        return self.pano_dir / 'resized_images'
+
+    @property
+    def pano_resized_depth_dir(self):
+        return self.pano_dir / 'resized_depth'
+
+    @property
+    def pano_resized_mask_dir(self):
+        return self.pano_dir / 'resized_anon_mask'
+
+    @property
+    def pano_resized_azim_dir(self):
+        return self.pano_dir / 'resized_azim'
+
+    @property
+    def pano_resized_elev_dir(self):
+        return self.pano_dir / 'resized_elev'
+    ##########################################################
+    # DSLR assets
+    ##########################################################
     @property
     def dslr_dir(self):
         return self.data_root / self._scene_id / self.dslr_folder_name
@@ -154,7 +204,9 @@ class ScannetppScene_Release:
     def dslr_train_test_lists_path(self):
         return self.dslr_dir / 'train_test_lists.json'
 
-    ##### iphone #####
+    ##########################################################
+    # iPhone assets
+    ##########################################################
     @property
     def iphone_data_dir(self):
         return self.data_root / self._scene_id / self.iphone_folder_name
