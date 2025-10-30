@@ -1,0 +1,12 @@
+data_dir: <path to data>
+
+scene_ids:  [a08dda47a8]
+
+# use "original" for high resolution large-size images, slow loading
+# use "resized" for smaller images, faster loading
+pano_type: resized 
+
+# downsample the resulting pointcloud uniformly to reduce its size before saving
+downsample_factor: 10
+
+save_dir: <path to save dir>
