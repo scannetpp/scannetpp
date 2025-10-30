@@ -31,6 +31,8 @@ Contents
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
     * [Novel View Synthesis Evaluation (iPhone)](#novel-view-synthesis-evaluation-iphone)
+* [Panocam](#panocam)
+    * [Backproject panocam images](#backproject-panocam-images)
 * [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
@@ -265,6 +267,21 @@ NOTE: if you just updated this repo, please make sure that you install the [POT 
 
 The color correction process is defined in `iphone/color_correction.py`. It computes the optimal transport between the color distribution of the rendered images and the ground-truth DSLR images. The color-corrected images will be saved in `OUTPUT_DIR/<SCENE_ID>/` during the evaluation.
 
+
+## Panocam
+### Backproject panocam images
+The dataset contains anonymized RGB panocam images, depth maps, anonymization masks, and azimuth and elevation maps (in spherical coordinates) for each RGB image. These can be used to backproject the panocam images to 3D and obtain a high resolution point cloud.
+
+RGB is a JPG file, mask is a binary PNG file, and the rest are 16 bit integer PNG files with the original float values multiplied by 1000.
+
+Panocam images are excluded in the NVS test sets. 
+
+Note: some panocam images have an aspect ratio of 2:1 and contain the scanner itself, and some have an aspect ratio of 2.5:1 and do not contain the scanner. The mask of valid pixels in both cases can be obtained by `depth > 0`.
+
+To backproject the panocam images to 3D, use the following script:
+```
+python -m panocam.backproject
+```
 
 ## Benchmarks
 ### Semantic Segmentation

@@ -17,9 +17,10 @@ except ImportError:
 from tqdm import tqdm
 import open3d as o3d
 
-from scannetpp.common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
-from scannetpp.common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
-from scannetpp.common.utils.rasterize import undistort_rasterization, upsample_rasterization
+from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
+from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
+from common.utils.rasterize import undistort_rasterization, upsample_rasterization
+from common.file_io import write_json, load_json
 
 def viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path):
     '''
