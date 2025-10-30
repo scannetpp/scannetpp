@@ -31,8 +31,8 @@ Contents
 * [Novel View Synthesis](#novel-view-synthesis)
     * [Novel View Synthesis Evaluation (DSLR)](#novel-view-synthesis-evaluation-dslr)
     * [Novel View Synthesis Evaluation (iPhone)](#novel-view-synthesis-evaluation-iphone)
-* [Panocam](#panocam)
-    * [Backproject panocam images](#backproject-panocam-images)
+* [Panocam/High-resolution point clouds](#panocam)
+    * [Backproject panocam images to high-res point clouds](#backproject-panocam-images-to-high-resolution-point-clouds)
 * [Benchmarks](#benchmarks)
 * [Contributing](#contributing)
 * [Citation](#citation)
@@ -269,8 +269,8 @@ The color correction process is defined in `iphone/color_correction.py`. It comp
 
 
 ## Panocam
-### Backproject panocam images
-The dataset contains anonymized RGB panocam images, depth maps, anonymization masks, and azimuth and elevation maps (in spherical coordinates) for each RGB image. These can be used to backproject the panocam images to 3D and obtain a high resolution point cloud.
+### Backproject panocam images to high resolution point clouds
+The dataset contains anonymized RGB panocam images, depth maps, anonymization masks, and azimuth and elevation maps (in spherical coordinates) for each RGB image. These can be used to backproject the panocam images to 3D and obtain a high resolution point cloud of each individual scan. The names of the panocam images correspond to the scan IDs, 1 image per scan position.
 
 RGB is a JPG file, mask is a binary PNG file, and the rest are 16 bit integer PNG files with the original float values multiplied by 1000.
 
