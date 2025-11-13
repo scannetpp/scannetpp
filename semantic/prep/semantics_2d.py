@@ -314,7 +314,7 @@ def main(cfg : DictConfig) -> None:
                     x, y, w, h = obj_bbox
                     # center of the bbox
                     obj_location_2d = np.round([x + w/2, y + h/2]).tolist()
-                    obj_dims_3d = np.round(obj_id_dims[obj_id], 2).tolist()
+                    obj_dims_3d = obj_id_dims[obj_id]
                     # semantic label
                     obj_label = anno['objects'][obj_id]['label']
                     # vertices in this object
