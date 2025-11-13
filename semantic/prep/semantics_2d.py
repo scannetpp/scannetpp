@@ -335,6 +335,9 @@ def main(cfg : DictConfig) -> None:
                     if cfg.save_obj_meshes:
                         # crop the mesh to the object 3d bbox
                         bbox_rot = np.array(anno['objects'][obj_id]['obb']['normalizedAxes']).reshape(3, 3).T
+                        obj_dims_3d = np.array(obj_dims_3d)
+                        if cfg.get('expand_mesh_factor'):
+                            obj_dims_3d = obj_dims_3d * cfg.expand_mesh_factor
                         bbox_3d = o3d.geometry.OrientedBoundingBox(obj_location_3d, bbox_rot, obj_dims_3d)
                         # crop the mesh to the 3d bbox
                         obj_mesh = mesh.crop(bbox_3d)
