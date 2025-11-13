@@ -53,8 +53,9 @@ def main(cfg : DictConfig) -> None:
     objid_gt_2d_dir = save_dir / 'obj_ids'
     undistorted_dir = save_dir / 'undistorted'
     obj_pcs_dir = save_dir / 'obj_pcs'
+    obj_meshes_dir = save_dir / 'obj_meshes'
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, semantics_dir, semantics_viz_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, obj_meshes_dir, semantics_dir, semantics_viz_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -330,6 +331,18 @@ def main(cfg : DictConfig) -> None:
                             obj_pc.points = o3d.utility.Vector3dVector(np.asarray(mesh.vertices)[obj_mask_3d])
                             obj_pc.colors = o3d.utility.Vector3dVector(np.asarray(mesh.vertex_colors)[obj_mask_3d])
                             o3d.io.write_point_cloud(str(out_path), obj_pc)
+
+                    if cfg.save_obj_meshes:
+                        # crop the mesh to the object 3d bbox
+                        bbox_rot = np.array(anno['objects'][obj_id]['obb']['normalizedAxes']).reshape(3, 3).T
+                        bbox_3d = o3d.geometry.OrientedBoundingBox(obj_location_3d, bbox_rot, obj_dims_3d)
+                        # crop the mesh to the 3d bbox
+                        obj_mesh = mesh.crop(bbox_3d)
+                        # save the mesh
+                        out_path = obj_meshes_dir / scene_id / f'{obj_id}.ply'
+                        out_path.parent.mkdir(parents=True, exist_ok=True)
+                        o3d.io.write_triangle_mesh(str(out_path), obj_mesh)
+
 
 if __name__ == "__main__":
     main()
