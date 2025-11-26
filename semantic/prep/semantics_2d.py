@@ -91,8 +91,8 @@ def main(cfg : DictConfig) -> None:
                                                        limit_images=cfg.limit_images,
                                                        anno=anno)
         if cfg.create_visiblity_cache_only:
-                print(f'Created visibility cache for {scene_id}')
-                continue
+            print(f'Created visibility cache for {scene_id}')
+            continue
 
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
@@ -284,9 +284,10 @@ def main(cfg : DictConfig) -> None:
                             if image_name not in top_images: 
                                 continue
 
+                    img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
+                    
                     # crop the object from the image
                     if cfg.save_obj_crop:
-                        img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
                         # TODO: save jpgs, use less space!
                         img_crop_path = img_crop_dir / scene_id / f'{image_name}_{obj_id}.png'
                         save_img(img_crop, img_crop_path)
