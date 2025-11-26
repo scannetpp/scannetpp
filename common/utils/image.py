@@ -18,8 +18,8 @@ def get_img_crop(img, bbox, bbox_expand_factor, expand_bbox=True):
 def save_img(img, path):
     # make parent if necessary
     path.parent.mkdir(parents=True, exist_ok=True)
-    o3d_img = o3d.geometry.Image(img.astype(np.uint8))
-    o3d.io.write_image(str(path), o3d_img)
+    # save with cv2, convert to BGR before saving, prob faster?
+    cv2.imwrite(str(path), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
 
 def load_image(img_path):
     return np.asarray(o3d.io.read_image(img_path))

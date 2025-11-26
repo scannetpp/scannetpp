@@ -47,6 +47,7 @@ def main(cfg : DictConfig) -> None:
     semantics_viz_dir = save_dir / 'semantics_viz'
     img_crop_dir =  save_dir / 'img_crops'
     img_crop_nobg_dir = save_dir / 'img_crops_nobg'
+    img_crop_mask_dir = save_dir / 'img_crops_mask'
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
     viz_obj_ids_txt_dir = save_dir / 'viz_obj_ids_txt'
@@ -54,8 +55,11 @@ def main(cfg : DictConfig) -> None:
     undistorted_dir = save_dir / 'undistorted'
     obj_pcs_dir = save_dir / 'obj_pcs'
     obj_meshes_dir = save_dir / 'obj_meshes'
+    
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, obj_meshes_dir, semantics_dir, semantics_viz_dir]:
+    for dir in [img_crop_dir, img_crop_nobg_dir, img_crop_mask_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, 
+        objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, obj_meshes_dir, semantics_dir, 
+        semantics_viz_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
     rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
@@ -196,7 +200,7 @@ def main(cfg : DictConfig) -> None:
                 print(f'Filtering obj ids: {cfg.filter_obj_ids}')
                 pix_obj_ids = np.where(np.isin(pix_obj_ids, cfg.filter_obj_ids), pix_obj_ids, -1)
 
-            if cfg.dbg.viz_obj_ids: # save viz to file
+            if cfg.viz_obj_ids: # save viz to file
                 out_path = viz_obj_ids_dir / scene_id / f'{image_name}.png'
                 viz_ids(img, pix_obj_ids, out_path)
 
@@ -281,20 +285,36 @@ def main(cfg : DictConfig) -> None:
                                 continue
 
                     # crop the object from the image
-                    img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
-                    img_crop_path = img_crop_dir / scene_id / f'{image_name}_{obj_id}.png'
-                    save_img(img_crop, img_crop_path)
+                    if cfg.save_obj_crop:
+                        img_crop = get_img_crop(img, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
+                        # TODO: save jpgs, use less space!
+                        img_crop_path = img_crop_dir / scene_id / f'{image_name}_{obj_id}.png'
+                        save_img(img_crop, img_crop_path)
+
+                    if cfg.save_obj_crop_nobg or cfg.save_obj_crop_mask:
+                        # crop pix_obj_ids to the same size
+                        pix_obj_ids_crop = get_img_crop(pix_obj_ids, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
 
                     # save image crop without background
-                    # crop pix_obj_ids to the same size
-                    pix_obj_ids_crop = get_img_crop(pix_obj_ids, obj_bbox, cfg.bbox_expand_factor, expand_bbox=True)
-                    # make copy of img_crop
-                    img_crop_nobg = img_crop.copy()
-                    # set background to gray in regions not the current object
-                    img_crop_nobg[pix_obj_ids_crop != obj_id] = 128
-                    # save
-                    img_crop_nobg_path = img_crop_nobg_dir / scene_id / f'{image_name}_{obj_id}.png'
-                    save_img(img_crop_nobg, img_crop_nobg_path)
+                    if cfg.save_obj_crop_nobg:
+                        # make copy of img_crop
+                        img_crop_nobg = img_crop.copy()
+                        # set background to black in regions not the current object
+                        img_crop_nobg[pix_obj_ids_crop != obj_id] = 0
+                        # save
+                        img_crop_nobg_path = img_crop_nobg_dir / scene_id / f'{image_name}_{obj_id}.png'
+                        save_img(img_crop_nobg, img_crop_nobg_path)
+
+                    if cfg.save_obj_crop_mask:
+                        # make copy of img_crop
+                        img_crop_mask = img_crop.copy()
+                        # set background to 0 in regions not the current object
+                        img_crop_mask[pix_obj_ids_crop != obj_id] = 0
+                        # set foreground to white
+                        img_crop_mask[pix_obj_ids_crop == obj_id] = 255
+                        # save
+                        img_crop_mask_path = img_crop_mask_dir / scene_id / f'{image_name}_{obj_id}.png'
+                        save_img(img_crop_mask, img_crop_mask_path)
 
                     # draw a bbox around the object and save the full image
                     # create new image with bbox of the object draw on the full image
