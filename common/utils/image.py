@@ -20,7 +20,12 @@ def save_img(img, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     # save with cv2, convert to BGR before saving, prob faster?
     try:
-        cv2.imwrite(str(path), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        # 3 channels (hw3) or 1 channel (hw)
+        if len(img.shape) == 3:
+            cv2.imwrite(str(path), cv2.cvtColor(img, cv2.COLOR_RGB2BGR))
+        else:
+            # grayscale
+            cv2.imwrite(str(path), img)
     except cv2.error:
         print(f'Error saving image to {path}')
 

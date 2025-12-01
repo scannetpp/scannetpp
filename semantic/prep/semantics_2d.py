@@ -313,34 +313,39 @@ def main(cfg : DictConfig) -> None:
                         img_crop_mask[pix_obj_ids_crop != obj_id] = 0
                         # set foreground to white
                         img_crop_mask[pix_obj_ids_crop == obj_id] = 255
+                        # keep only 1 channel
+                        img_crop_mask = img_crop_mask[:, :, 0]
                         # save
                         img_crop_mask_path = img_crop_mask_dir / scene_id / f'{image_name}_{obj_id}.png'
                         save_img(img_crop_mask, img_crop_mask_path)
 
-                    # draw a bbox around the object and save the full image
-                    # create new image with bbox of the object draw on the full image
-                    img_copy = img.copy()
-                    x, y, w, h = obj_bbox
-                    # convert image RGB to BGR
-                    img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR)
-                    cv2.rectangle(img_copy, (y, x), (y+h, x+w), (0, 0, 255), 2)
-                    # convert back to RGB
-                    img_copy = cv2.cvtColor(img_copy, cv2.COLOR_BGR2RGB)
-                    global_prompt_img_path = bbox_img_dir / scene_id / f'{image_name}_{obj_id}.png'
-                    # save it to file
-                    save_img(img_copy, global_prompt_img_path)
+                    if cfg.save_bbox_img:
+                        # draw a bbox around the object and save the full image
+                        # create new image with bbox of the object draw on the full image
+                        img_copy = img.copy()
+                        x, y, w, h = obj_bbox
+                        # convert image RGB to BGR
+                        img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR)
+                        cv2.rectangle(img_copy, (y, x), (y+h, x+w), (0, 0, 255), 2)
+                        # convert back to RGB
+                        img_copy = cv2.cvtColor(img_copy, cv2.COLOR_BGR2RGB)
+                        bbox_img_path = bbox_img_dir / scene_id / f'{image_name}_{obj_id}.png'
+                        # save it to file
+                        save_img(img_copy, bbox_img_path)
 
                     # other useful info for this object
-                    obj_location_3d = np.round(obj_id_locations[obj_id], 2).tolist()
-                    x, y, w, h = obj_bbox
                     # center of the bbox
+                    x, y, w, h = obj_bbox
+                    # 2d properties
                     obj_location_2d = np.round([x + w/2, y + h/2]).tolist()
-                    obj_dims_3d = obj_id_dims[obj_id]
                     # semantic label
                     obj_label = anno['objects'][obj_id]['label']
-                    # vertices in this object
+                    # 3d properties
+                    obj_location_3d = np.round(obj_id_locations[obj_id], 2).tolist()
+                    obj_dims_3d = obj_id_dims[obj_id]
                     obj_mask_3d = vtx_obj_ids == obj_id
 
+                    # 3d outputs
                     # save the object point cloud
                     if cfg.save_obj_pcs:
                         out_path = obj_pcs_dir / scene_id / f'{obj_id}.ply'
