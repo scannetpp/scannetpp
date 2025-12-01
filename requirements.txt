@@ -13,3 +13,5 @@ torchmetrics==1.2.0
 scipy
 open3d
 POT
+omegaconf
+hydra-core
