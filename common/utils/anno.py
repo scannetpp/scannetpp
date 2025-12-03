@@ -2,25 +2,45 @@
 utils related to 3d semantic+instance annotations
 '''
 try:
+    # not required for all functions
     from torch_scatter import scatter_mean
+    import torch
+    import open3d as o3d
 except ImportError:
     print('torch_scatter not found')
     pass
+
 from collections import defaultdict
 import json
 import numpy as np
 from pathlib import Path
-try:
-    import torch
-except ImportError:
-    pass
 from tqdm import tqdm
-import open3d as o3d
 
 from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
 from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
 from common.utils.rasterize import undistort_rasterization, upsample_rasterization
 from common.file_io import write_json, load_json
+
+def get_top_images_from_visibility(obj_id, visibility_data):
+    '''
+    obj_id: object id
+    visibility_data: visibility data for a scene
+
+    return: sorted list of image names in order of max to min visible vertices
+    '''
+    images_visibilites = []
+    # go through each image
+    for i_name in visibility_data['images']:
+        # convert obj keys to str always!
+        # check if this object is visible in this image
+        if str(obj_id) in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][str(obj_id)]:
+            # (image, visible frac)
+            images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][str(obj_id)]['visible_vertices_frac']))
+    # sort descending by visibility
+    images_visibilites.sort(key=lambda x: x[1], reverse=True)
+    top_images = [i_name for i_name, _ in images_visibilites]
+
+    return top_images
 
 def viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path):
     '''
