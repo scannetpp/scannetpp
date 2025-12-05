@@ -30,10 +30,16 @@ from loguru import logger
 
 from common.utils.dslr import crop_undistorted_dslr_image
 
-from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
-from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
-from common.utils.rasterize import undistort_rasterization, upsample_rasterization, undistort_pix_to_face, upsample_pix_to_face
-from common.file_io import write_json, load_json
+from scannetpp.common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
+from scannetpp.common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
+from scannetpp.common.utils.rasterize import undistort_rasterization, upsample_rasterization
+from scannetpp.common.file_io import write_json, load_json
+
+def get_obj_visibility(obj_id, img_name, visibility_data):
+    '''
+    get the visibility of an object in an image
+    '''
+    return visibility_data['images'][img_name]['objects'][str(obj_id)]['visible_vertices_frac']
 
 def get_top_images_from_visibility(obj_id, visibility_data):
     '''
