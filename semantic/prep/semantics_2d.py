@@ -14,6 +14,7 @@ import torch
 import numpy as np
 import cv2
 
+from common.utils.dslr import crop_undistorted_dslr_image
 from common.utils.dslr import compute_undistort_intrinsic
 from common.utils.colmap import get_camera_images_poses, camera_to_intrinsic
 from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper, viz_sem_ids_2d
@@ -88,6 +89,7 @@ def main(cfg : DictConfig) -> None:
                                                        cfg.image_type, 
                                                        cfg.subsample_factor, 
                                                        cfg.undistort_dslr, 
+                                                       cfg.crop_undistorted_dslr_factor,
                                                        limit_images=cfg.limit_images,
                                                        anno=anno)
         if cfg.create_visiblity_cache_only:
@@ -181,7 +183,7 @@ def main(cfg : DictConfig) -> None:
             pix_to_face = pix_to_face.numpy()
 
             if undistort_map1 is not None and undistort_map2 is not None:
-                # apply undistortion to rasterization (nearest neighbor), zbuf (linear) and image (linear)
+                # apply undistortion to rasterization (nearest neighbor), image (linear)
                 pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
                     interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
                 )
@@ -189,6 +191,9 @@ def main(cfg : DictConfig) -> None:
                 img = cv2.remap(img, undistort_map1, undistort_map2,
                     interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
                 )
+                if cfg.crop_undistorted_dslr_factor is not None:
+                    pix_to_face = crop_undistorted_dslr_image(pix_to_face, cfg.crop_undistorted_dslr_factor)
+                    img = crop_undistorted_dslr_image(img, cfg.crop_undistorted_dslr_factor)
             # get object IDs on image
             try:
                 pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh)
@@ -345,7 +350,10 @@ def main(cfg : DictConfig) -> None:
                     obj_dims_3d = obj_id_dims[obj_id]
                     obj_mask_3d = vtx_obj_ids == obj_id
 
+                    ################
                     # 3d outputs
+                    ################
+
                     # save the object point cloud
                     if cfg.save_obj_pcs:
                         out_path = obj_pcs_dir / scene_id / f'{obj_id}.ply'

@@ -9,6 +9,8 @@ exclude_scenes: []
 # image type - iphone or dslr
 image_type: dslr
 undistort_dslr: true
+# crop undistorted dslr images on the left and right to reduce distortion
+crop_undistorted_dslr_factor:
 create_visiblity_cache_only: false
 
 ############## other data filters ##########

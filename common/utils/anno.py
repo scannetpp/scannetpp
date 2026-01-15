@@ -4,10 +4,19 @@ utils related to 3d semantic+instance annotations
 try:
     # not required for all functions
     from torch_scatter import scatter_mean
-    import torch
-    import open3d as o3d
 except ImportError:
     print('torch_scatter not found')
+    pass
+
+try:
+    import torch
+except ImportError:
+    print('torch not found')
+    pass
+try:
+    import open3d as o3d
+except ImportError:
+    print('open3d not found')
     pass
 
 from collections import defaultdict
@@ -15,6 +24,8 @@ import json
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+
+from common.utils.dslr import crop_undistorted_dslr_image
 
 from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
 from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
@@ -83,7 +94,9 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
     return pix_sem_ids
 
-def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, undistort_dslr=None, limit_images=None, anno=None):
+def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
+                undistort_dslr=None, crop_undistorted_dslr_factor=None, 
+                limit_images=None, anno=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
@@ -91,8 +104,10 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
-        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, subsample_factor=subsample_factor, undistort_dslr=undistort_dslr,
-                                           limit_images=limit_images)
+        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, 
+                                        subsample_factor=subsample_factor, undistort_dslr=undistort_dslr, 
+                                        crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
+                                        limit_images=limit_images)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
         write_json(cached_path, visiblity_data)
@@ -171,8 +186,12 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, undistort_dslr=True, limit_images=None):
+def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, 
+                undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None):
     '''
+    undistort_dslr: if True, undistort the dslr images and then compute visibility
+    crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
+
     dict for 1 scene
 
     objects
@@ -238,6 +257,10 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, und
 
         if image_type == 'dslr' and undistort_dslr: # undistort
             pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2)
+
+            if crop_undistorted_dslr_factor is not None:
+                pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
+                zbuf = crop_undistorted_dslr_image(zbuf, crop_undistorted_dslr_factor)
                 
         valid_pix_to_face =  pix_to_face[:, :] != -1
         face_ndx = pix_to_face[valid_pix_to_face]
