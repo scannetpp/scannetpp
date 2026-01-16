@@ -1,8 +1,8 @@
 '''
 Get 3D semantics onto 2D images using precomputed rasterization
 '''
-
-from common.utils.image import get_img_crop, load_image, save_img, viz_ids, viz_obj_ids_txt
+import copy
+from common.utils.image import get_expanded_bbox, get_img_crop, load_image, save_img, viz_ids, viz_obj_ids_txt
 from omegaconf import DictConfig
 from pathlib import Path
 import hydra
@@ -292,7 +292,6 @@ def main(cfg : DictConfig) -> None:
                     
                     # crop the object from the image
                     if cfg.save_obj_crop:
-                        # TODO: save jpgs, use less space!
                         img_crop_path = img_crop_dir / scene_id / f'{image_name}_{obj_id}.jpg'
                         save_img(img_crop, img_crop_path)
 
@@ -319,7 +318,6 @@ def main(cfg : DictConfig) -> None:
                         img_crop_mask[pix_obj_ids_crop == obj_id] = 255
                         # keep only 1 channel
                         img_crop_mask = img_crop_mask[:, :, 0]
-                        # save
                         # save mask as PNG, no compression
                         img_crop_mask_path = img_crop_mask_dir / scene_id / f'{image_name}_{obj_id}.png'
                         save_img(img_crop_mask, img_crop_mask_path)
@@ -328,7 +326,11 @@ def main(cfg : DictConfig) -> None:
                         # draw a bbox around the object and save the full image
                         # create new image with bbox of the object draw on the full image
                         img_copy = img.copy()
-                        x, y, w, h = obj_bbox
+                        # viz the expanded bbox if specified!
+                        viz_bbox = copy.deepcopy(obj_bbox)
+                        if cfg.bbox_expand_factor:
+                            viz_bbox = get_expanded_bbox(viz_bbox, img, cfg.bbox_expand_factor)
+                        x, y, w, h = viz_bbox
                         # convert image RGB to BGR
                         img_copy = cv2.cvtColor(img_copy, cv2.COLOR_RGB2BGR)
                         cv2.rectangle(img_copy, (y, x), (y+h, x+w), (0, 0, 255), 2)

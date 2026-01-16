@@ -3,15 +3,21 @@ import numpy as np
 import cv2
 
 
+def get_expanded_bbox(bbox, img, expand_factor):
+    x, y, w, h = bbox
+    if expand_factor > 0:
+        # keep the new x, y, w, h within the image 
+        x = max(0, int(bbox[0] - expand_factor*bbox[2]))
+        y = max(0, int(bbox[1] - expand_factor*bbox[3]))
+        w = min(img.shape[0] - x, int(bbox[2] + 2*expand_factor*bbox[2]))
+        h = min(img.shape[1] - y, int(bbox[3] + 2*expand_factor*bbox[3]))
+    return (x, y, w, h)
+
 def get_img_crop(img, bbox, bbox_expand_factor, expand_bbox=True):
     # x is along the width, y is along the height
+    if expand_bbox:
+        bbox = get_expanded_bbox(bbox, img, bbox_expand_factor)
     x, y, w, h = bbox
-    if expand_bbox and bbox_expand_factor > 0:
-        # keep the new x, y, w, h within the image 
-        x = max(0, int(bbox[0] - bbox_expand_factor*bbox[2]))
-        y = max(0, int(bbox[1] - bbox_expand_factor*bbox[3]))
-        w = min(img.shape[0] - x, int(bbox[2] + 2*bbox_expand_factor*bbox[2]))
-        h = min(img.shape[1] - y, int(bbox[3] + 2*bbox_expand_factor*bbox[3]))
     return img[x:x+w, y:y+h]
 
 
