@@ -7,14 +7,16 @@ try:
         MeshRasterizer,  
         fisheyecameras
     )
-except:
-    pass
+except Exception as e:
+    print(f'Error importing pytorch3d: {e}')
+
 try:
     # some functions need only torch
     import torch
     device = torch.device("cuda:0")
 except:
-    pass
+    print(f'Error importing torch: {e}')
+
 import numpy as np
 import cv2
 
