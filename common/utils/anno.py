@@ -41,7 +41,7 @@ def get_obj_visibility(obj_id, img_name, visibility_data):
     '''
     return visibility_data['images'][img_name]['objects'][str(obj_id)]['visible_vertices_frac']
 
-def get_top_images_from_visibility(obj_id, visibility_data):
+def get_top_images_from_visibility(obj_id, visibility_data, return_visiblities=False):
     '''
     obj_id: object id
     visibility_data: visibility data for a scene
@@ -59,8 +59,12 @@ def get_top_images_from_visibility(obj_id, visibility_data):
     # sort descending by visibility
     images_visibilites.sort(key=lambda x: x[1], reverse=True)
     top_images = [i_name for i_name, _ in images_visibilites]
+    top_visibilities = [visibility for _, visibility in images_visibilites]
 
-    return top_images
+    if return_visiblities:
+        return top_images, top_visibilities
+    else:
+        return top_images
 
 def viz_sem_ids_2d(pix_sem_ids, semantic_colors, out_path):
     '''
