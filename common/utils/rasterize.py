@@ -17,6 +17,11 @@ try:
 except:
     print(f'Error importing torch: {e}')
 
+try:
+    import nvdiffrast.torch as dr
+except Exception as e:
+    print(f'Error importing nvdiffrast: {e}')
+
 import numpy as np
 import cv2
 
@@ -194,6 +199,101 @@ def rasterize_mesh(meshes, img_height, img_width, cameras):
     }
 
     return raster_out_dict
+
+def project_fisheye_single(v_world, pose, intrinsic, distort_params, img_height, img_width):
+    """
+    Transforms world-space vertices into Nvdiffrast-compatible clip space for one pose.
+    """
+    # 1. World to Camera Space
+    # v_world: [N, 3], pose: [4, 4]
+    v_homo = torch.cat([v_world, torch.ones_like(v_world[:, :1])], dim=-1)
+    # mat = pose
+    v_cam = (v_homo @ pose.T)[:, :3]
+    
+    x, y, z = v_cam[:, 0], v_cam[:, 1], v_cam[:, 2]
+    
+    # 2. Apply Fisheye (Kannala-Brandt model)
+    r = torch.sqrt(x**2 + y**2) + 1e-10
+    theta = torch.atan2(r, z)
+    
+    t2 = theta**2
+    k1, k2, k3, k4 = distort_params[:4]
+    theta_d = theta * (1 + k1*t2 + k2*(t2**2) + k3*(t2**3) + k4*(t2**4))
+    
+    # 3. Project to Image Plane
+    scale = theta_d / r
+    u = scale * x * intrinsic[0, 0] + intrinsic[0, 2]
+    v = scale * y * intrinsic[1, 1] + intrinsic[1, 2]
+    
+    # 4. Map to Nvdiffrast Clip Space [-1, 1]
+    u_clip = (2.0 * u / img_width) - 1.0
+    # flip Y to go to nvdiffrast convention
+    v_clip = 1.0 - (2.0 * v / img_height)
+    
+    z_min = z.min()
+    z_max = z.max()
+
+    # normalize Z 0-1
+    z_clip = (z - z_min) / (z_max - z_min)
+
+    # Inside project_fisheye_single
+    mask = (z < 0.01) | (theta > (np.pi / 2.0))
+
+    # set to inf in clip space to avoid rasterization
+    u_clip = torch.where(mask, torch.tensor(float('inf'), device=z.device), u_clip)
+    v_clip = torch.where(mask, torch.tensor(float('inf'), device=z.device), v_clip)
+    z_clip = torch.where(mask, torch.tensor(float('inf'), device=z.device), z_clip)
+    
+    # Return [1, N, 4] as Nvdiffrast expects a batch dimension
+    return torch.stack([u_clip, v_clip, z_clip, torch.ones_like(z)], dim=-1).unsqueeze(0)
+
+def rasterize_mesh_nvdiffrast(mesh, img_height, img_width, pose, intrinsic, distort_params, img):
+    """
+    Single-image forward-only rasterization.
+    mesh: open3d mesh
+    img_height, img_width: int
+    pose: 4x4 with R and t
+    intrinsic: 3x3 with fx, fy, cx, cy
+    distort_params: 4-element array of distortion parameters
+    """
+    device = torch.device("cuda:0")
+
+    v_pos = torch.Tensor(np.array(mesh.vertices)).to(device)
+    faces = torch.Tensor(np.array(mesh.triangles)).to(device).to(torch.int32)
+    img_dims = (img_height, img_width)
+
+    ctx = dr.RasterizeCudaContext()
+
+    with torch.no_grad():
+        # vertex locations in clip space, with distortion
+        v_clip = project_fisheye_single(
+            v_pos, torch.Tensor(pose).to(device), torch.Tensor(intrinsic).to(device), 
+            torch.Tensor(distort_params).to(device), img_height, img_width
+        )
+
+        # rasterize mesh into image
+        # v_clip = clipped vertices, N,4
+        # faces: ntriangles, 3
+        # img_dims: height, width
+        # grad_db: False, no gradients
+        rast, _ = dr.rasterize(
+            ctx, v_clip, faces, img_dims, 
+            grad_db=False
+        )
+
+        # Step 3: Extract face IDs (0-indexed, -1 for background)
+        # (u, v, z/w, triangle_id) -> BHW3
+        pixel_to_face = rast[0, ..., 3].int() - 1
+
+    # flip the rows
+    pixel_to_face = torch.flip(pixel_to_face, dims=[0])
+
+    raster_out_dict = {
+        'pix_to_face': pixel_to_face.cpu(),
+    }
+
+    return raster_out_dict
+
 
 def prep_pt3d_inputs(mesh):
     verts = np.array(mesh.vertices)
