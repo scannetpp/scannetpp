@@ -21,7 +21,7 @@ from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_fr
 from common.file_io import read_txt_list
 from common.scene_release import ScannetppScene_Release
 
-from common.utils.rasterize import get_fisheye_cameras_batch, get_opencv_cameras_batch, prep_pt3d_inputs, rasterize_mesh
+from common.utils.rasterize import get_fisheye_cameras_batch, prep_pt3d_inputs, rasterize_mesh
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name='semantics_2d')
@@ -91,7 +91,8 @@ def main(cfg : DictConfig) -> None:
                                                        cfg.undistort_dslr, 
                                                        cfg.crop_undistorted_dslr_factor,
                                                        limit_images=cfg.limit_images,
-                                                       anno=anno)
+                                                       anno=anno,
+                                                       filter_obj_ids=cfg.filter_obj_ids)
         if cfg.create_visiblity_cache_only:
             print(f'Created visibility cache for {scene_id}')
             continue

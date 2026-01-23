@@ -96,7 +96,7 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
 def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
-                limit_images=None, anno=None):
+                limit_images=None, anno=None, filter_obj_ids=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
@@ -107,7 +107,7 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
         visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, 
                                         subsample_factor=subsample_factor, undistort_dslr=undistort_dslr, 
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
-                                        limit_images=limit_images)
+                                        limit_images=limit_images, filter_obj_ids=filter_obj_ids)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
         write_json(cached_path, visiblity_data)
@@ -187,7 +187,8 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
 
 
 def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, 
-                undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None):
+                undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
+                filter_obj_ids=None):
     '''
     undistort_dslr: if True, undistort the dslr images and then compute visibility
     crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
@@ -276,6 +277,9 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         # get all required stats per object visible in the image
         for (obj_id, obj_bbox) in tqdm(bboxes_2d.items(), desc='obj', leave=False):
             if obj_id <= 0:
+                continue
+        
+            if filter_obj_ids is not None and obj_id not in filter_obj_ids:
                 continue
 
             obj_mask_3d = anno['vertex_obj_ids'] == obj_id
