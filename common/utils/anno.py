@@ -433,8 +433,11 @@ def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
 
     mesh_faces_np = np.array(mesh.triangles)
 
-    # pix to obj id
-    pix_vtx_prop = np.zeros_like(pix_to_face)
+    # if the property is n dimensional (n,3), then pix_vtx_prop should have extra dimension
+    if len(vtx_prop.shape) == 2:
+        pix_vtx_prop = np.zeros((pix_to_face.shape[0], pix_to_face.shape[1], vtx_prop.shape[1]))
+    else:
+        pix_vtx_prop = np.zeros_like(pix_to_face)
     # pick the first vertex of each face
     pix_vtx_prop[valid_pix_to_face] = vtx_prop[mesh_faces_np[pix_to_face[valid_pix_to_face]][:, 0]]
 
