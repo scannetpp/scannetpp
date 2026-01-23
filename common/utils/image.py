@@ -1,4 +1,5 @@
 import open3d as o3d
+from pathlib import Path
 import numpy as np
 import cv2
 
@@ -22,6 +23,8 @@ def get_img_crop(img, bbox, bbox_expand_factor, expand_bbox=True):
 
 
 def save_img(img, path):
+    if not isinstance(path, Path):
+        path = Path(path)
     # make parent if necessary
     path.parent.mkdir(parents=True, exist_ok=True)
     # save with cv2, convert to BGR before saving, prob faster?
