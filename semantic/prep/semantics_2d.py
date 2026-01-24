@@ -133,7 +133,7 @@ def main(cfg : DictConfig) -> None:
         raster_cache = None
         if cfg.rasterize_lib == 'nvdiffrast':
             # rasterize all the images at once and store the pix2face, reuse
-            with Timer(name='Rasterize all images', text="{name} done in {seconds:.4f}s"):
+            with Timer(name='Rasterizing', text="{name} done in {seconds:.4f}s"):
                 print(f'Rasterizing {len(image_list)} images...')
                 raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses, intrinsic, distort_params)
 
@@ -142,6 +142,7 @@ def main(cfg : DictConfig) -> None:
             visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, 
                                                        cfg.image_type, 
                                                        cfg.subsample_factor, 
+                                                       colmap_camera, image_list, distort_params, mesh,
                                                        cfg.undistort_dslr, 
                                                        cfg.crop_undistorted_dslr_factor,
                                                        limit_images=cfg.limit_images,
