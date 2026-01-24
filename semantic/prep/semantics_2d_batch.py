@@ -49,6 +49,7 @@ def main(cfg : DictConfig) -> None:
             'process_each_object': cfg.process_each_object,
             'save_obj_crop': cfg.save_obj_crop,
             'save_obj_crop_mask': cfg.save_obj_crop_mask,
+            'filter_objkeys_list_file': cfg.filter_objkeys_list_file,
         }
 
         n_scenes_queued += len(scene_id_group)
