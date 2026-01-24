@@ -95,6 +95,7 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
     return pix_sem_ids
 
 def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
+                colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
                 limit_images=None, anno=None, filter_obj_ids=None,
                 raster_cache=None):
@@ -105,8 +106,10 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
-        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, 
-                                        subsample_factor=subsample_factor, undistort_dslr=undistort_dslr, 
+        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type, 
+                                        subsample_factor, 
+                                        colmap_camera, image_list, distort_params, mesh,
+                                        undistort_dslr=undistort_dslr, 
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
                                         limit_images=limit_images, filter_obj_ids=filter_obj_ids,
                                         raster_cache=raster_cache)
@@ -188,7 +191,8 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, 
+def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor, 
+                colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
                 filter_obj_ids=None, raster_cache=None):
     '''
@@ -212,6 +216,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
                 zbuf_max: max zbuf value of the object in the image
     '''
     print(f'Computing visibility for {scene.scene_id}')
+    print(f'Num images for visibility check: {len(image_list)}')
 
     visibility_data = {
         'scene_id': scene.scene_id,
@@ -219,20 +224,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         'images': defaultdict(dict)
     }
 
-    mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
     faces = np.array(mesh.triangles)
-
-    # get list of images
-    # get the list of iphone/dslr images and poses
-    # NOTE: this should be the same list of images as raster_cache!
-    colmap_camera, image_list, _, distort_params = get_camera_images_poses(scene, subsample_factor, image_type)
-    print(f'Num images for visibility check: {len(image_list)}')
-    if limit_images is not None:
-        image_list = image_list[:limit_images]
-        print(f'Limiting viz check to {limit_images} images')
-    # keep first 4 elements
-    distort_params = distort_params[:4]
-
     intrinsic = camera_to_intrinsic(colmap_camera)
     img_height, img_width = colmap_camera.height, colmap_camera.width
 
@@ -240,7 +232,6 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         undistort_intrinsic = compute_undistort_intrinsic(intrinsic, img_height, img_width, distort_params)
         undistort_map1, undistort_map2 = get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width)
 
-    # for each image
     for image_ndx, image_name in enumerate(tqdm(image_list, desc='image')):
         visibility_data['images'][image_name]['objects'] = defaultdict(dict)
 
@@ -249,7 +240,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         else:
             # load rasterized output or do it now
             if rasterout_dir is not None:
-                rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
+                rasterout_path = rasterout_dir / scene.scene_id / f'{image_name}.pth'
                 raster_out_dict = torch.load(rasterout_path)
                 pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
                 # zbuf = raster_out_dict['zbuf'].squeeze().cpu()
@@ -287,7 +278,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
             if obj_id <= 0:
                 continue
         
-            if filter_obj_ids is not None and obj_id not in filter_obj_ids:
+            if filter_obj_ids and obj_id not in filter_obj_ids:
                 continue
 
             obj_mask_3d = anno['vertex_obj_ids'] == obj_id
@@ -325,6 +316,8 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
                 # 'zbuf_min': float(zbuf_min),
                 # 'zbuf_max': float(zbuf_max)
             }
+            break
+        break
 
     return visibility_data
 
