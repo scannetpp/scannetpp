@@ -29,7 +29,7 @@ from common.utils.dslr import crop_undistorted_dslr_image
 
 from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
 from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
-from common.utils.rasterize import undistort_rasterization, upsample_rasterization
+from common.utils.rasterize import undistort_rasterization, upsample_rasterization, undistort_pix_to_face, upsample_pix_to_face
 from common.file_io import write_json, load_json
 
 def get_top_images_from_visibility(obj_id, visibility_data):
@@ -96,7 +96,8 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
 def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
-                limit_images=None, anno=None, filter_obj_ids=None):
+                limit_images=None, anno=None, filter_obj_ids=None,
+                raster_cache=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
@@ -107,7 +108,8 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
         visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, 
                                         subsample_factor=subsample_factor, undistort_dslr=undistort_dslr, 
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
-                                        limit_images=limit_images, filter_obj_ids=filter_obj_ids)
+                                        limit_images=limit_images, filter_obj_ids=filter_obj_ids,
+                                        raster_cache=raster_cache)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
         write_json(cached_path, visiblity_data)
@@ -188,7 +190,7 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
 
 def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, 
                 undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
-                filter_obj_ids=None):
+                filter_obj_ids=None, raster_cache=None):
     '''
     undistort_dslr: if True, undistort the dslr images and then compute visibility
     crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
@@ -222,6 +224,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
 
     # get list of images
     # get the list of iphone/dslr images and poses
+    # NOTE: this should be the same list of images as raster_cache!
     colmap_camera, image_list, _, distort_params = get_camera_images_poses(scene, subsample_factor, image_type)
     print(f'Num images for visibility check: {len(image_list)}')
     if limit_images is not None:
@@ -238,30 +241,35 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         undistort_map1, undistort_map2 = get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width)
 
     # for each image
-    for image_name in tqdm(image_list, desc='image'):
+    for image_ndx, image_name in enumerate(tqdm(image_list, desc='image')):
         visibility_data['images'][image_name]['objects'] = defaultdict(dict)
 
-        # load rasterization
-        rasterout_path = raster_dir / scene.scene_id / f'{image_name}.pth'
-        raster_out_dict = torch.load(rasterout_path)
-
-        pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
-        zbuf = raster_out_dict['zbuf'].squeeze().cpu()
+        if raster_cache is not None:
+            pix_to_face = raster_cache['pix_to_face'][image_ndx]
+        else:
+            # load rasterized output or do it now
+            if rasterout_dir is not None:
+                rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
+                raster_out_dict = torch.load(rasterout_path)
+                pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
+                # zbuf = raster_out_dict['zbuf'].squeeze().cpu()
+            else:
+                raise ValueError(f'Rasterization not found for {image_name}')
 
         rasterized_dims = list(pix_to_face.shape)
 
         # upsample rasterization to the image dims
         if rasterized_dims != [img_height, img_width]: # upsample
-            pix_to_face, zbuf = upsample_rasterization(pix_to_face, zbuf, img_height, img_width)
+            pix_to_face = upsample_pix_to_face(pix_to_face, img_height, img_width)
 
         pix_to_face = pix_to_face.numpy()
 
         if image_type == 'dslr' and undistort_dslr: # undistort
-            pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2)
+            pix_to_face = undistort_pix_to_face(pix_to_face, undistort_map1, undistort_map2)
 
             if crop_undistorted_dslr_factor is not None:
                 pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
-                zbuf = crop_undistorted_dslr_image(zbuf, crop_undistorted_dslr_factor)
+                # zbuf = crop_undistorted_dslr_image(zbuf, crop_undistorted_dslr_factor)
                 
         valid_pix_to_face =  pix_to_face[:, :] != -1
         face_ndx = pix_to_face[valid_pix_to_face]
@@ -300,12 +308,12 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
             obj_pixel_mask = pix_obj_ids == obj_id
             num_obj_pixels = np.sum(obj_pixel_mask)
 
-            obj_zbuf = zbuf.squeeze()[obj_pixel_mask.squeeze()]
+            # obj_zbuf = zbuf.squeeze()[obj_pixel_mask.squeeze()]
             # keep only the >= 0 values
-            obj_zbuf = obj_zbuf[obj_zbuf >= 0]
+            # obj_zbuf = obj_zbuf[obj_zbuf >= 0]
 
-            zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
-            zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
+            # zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
+            # zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
 
             # string keys for json
             visibility_data['images'][image_name]['objects'][str(obj_id)] = {
@@ -314,8 +322,8 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
                 'visible_vertices_frac': float(visible_frac),
                 'num_visible_pixels': int(num_obj_pixels),
                 'visible_pixels_frac': float(num_obj_pixels / (img_height * img_width)),
-                'zbuf_min': float(zbuf_min),
-                'zbuf_max': float(zbuf_max)
+                # 'zbuf_min': float(zbuf_min),
+                # 'zbuf_max': float(zbuf_max)
             }
 
     return visibility_data
