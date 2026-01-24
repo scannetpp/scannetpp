@@ -168,7 +168,6 @@ def main(cfg : DictConfig) -> None:
                 continue
             
             try:
-                print(f'Loading image: {img_path}')
                 img = load_image(img_path) 
             except:
                 print(f'Error loading image: {img_path}, skipping')
@@ -275,7 +274,6 @@ def main(cfg : DictConfig) -> None:
 
             # get objid -> bbox x,y,w,h after upsampling rasterization, all the objs in this image
             bboxes_2d = get_bboxes_2d(pix_obj_ids)
-            print(f'Num objects in image: {len(bboxes_2d)}')
 
             if cfg.process_each_object:
                 # go through each object that has a bbox 
