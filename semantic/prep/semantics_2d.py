@@ -19,7 +19,7 @@ from common.utils.dslr import crop_undistorted_dslr_image
 from common.utils.dslr import compute_undistort_intrinsic
 from common.utils.colmap import get_camera_images_poses, camera_to_intrinsic
 from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper, viz_sem_ids_2d, get_top_images_from_visibility
-from common.file_io import read_txt_list
+from common.file_io import read_txt_list, load_json
 from common.scene_release import ScannetppScene_Release
 
 from common.utils.rasterize import get_fisheye_cameras_batch, prep_pt3d_inputs, rasterize_mesh, rasterize_mesh_nvdiffrast_large_batch
@@ -74,6 +74,10 @@ def main(cfg : DictConfig) -> None:
         semantic_colors = np.loadtxt(cfg.semantic_2d_palette_path, dtype=np.uint8)
         print(f'Num semantic classes: {len(semantic_classes)}')
 
+    filter_objkeys = None
+    if cfg.filter_objkeys_list_file:
+        filter_objkeys = load_json(cfg.filter_objkeys_list_file)
+
     # go through scenes
     for scene_id in tqdm(scene_list, desc='scene'):
         print(f'Running on scene: {scene_id}')
@@ -86,7 +90,18 @@ def main(cfg : DictConfig) -> None:
             anno['objects'] = {obj_id: anno['objects'][obj_id] for obj_id in cfg.filter_obj_ids}
             valid_vtx_mask = np.isin(anno['vertex_obj_ids'], cfg.filter_obj_ids)
             anno['vertex_obj_ids'][~valid_vtx_mask] = -1
-        
+
+        # set filter obj ids using the objkeys file
+        if filter_objkeys is not None:
+            # filter obj ids using the objkeys file
+            filter_obj_ids = [objkey[1] for objkey in filter_objkeys if objkey[0] == scene_id]
+            if len(filter_obj_ids) == 0:
+                print(f'No obj ids found for scene {scene_id} in the objkeys file, skipping scene')
+                continue
+            # set filter obj ids
+            cfg.filter_obj_ids = filter_obj_ids
+            print(f'Num objects from objkeys to process: {len(cfg.filter_obj_ids)}')
+
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
         mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
