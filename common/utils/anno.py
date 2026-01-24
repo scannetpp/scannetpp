@@ -316,8 +316,6 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
                 # 'zbuf_min': float(zbuf_min),
                 # 'zbuf_max': float(zbuf_max)
             }
-            break
-        break
 
     return visibility_data
 
