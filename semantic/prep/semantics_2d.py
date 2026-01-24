@@ -76,7 +76,9 @@ def main(cfg : DictConfig) -> None:
 
     filter_objkeys = None
     if cfg.filter_objkeys_list_file:
+        # list of (sceneid, objid) tuples
         filter_objkeys = load_json(cfg.filter_objkeys_list_file)
+        filter_objkeys = [tuple(key) for key in filter_objkeys]
 
     # go through scenes
     for scene_id in tqdm(scene_list, desc='scene'):
@@ -90,17 +92,6 @@ def main(cfg : DictConfig) -> None:
             anno['objects'] = {obj_id: anno['objects'][obj_id] for obj_id in cfg.filter_obj_ids}
             valid_vtx_mask = np.isin(anno['vertex_obj_ids'], cfg.filter_obj_ids)
             anno['vertex_obj_ids'][~valid_vtx_mask] = -1
-
-        # set filter obj ids using the objkeys file
-        if filter_objkeys is not None:
-            # filter obj ids using the objkeys file
-            filter_obj_ids = [objkey[1] for objkey in filter_objkeys if objkey[0] == scene_id]
-            if len(filter_obj_ids) == 0:
-                print(f'No obj ids found for scene {scene_id} in the objkeys file, skipping scene')
-                continue
-            # set filter obj ids
-            cfg.filter_obj_ids = filter_obj_ids
-            print(f'Num objects from objkeys to process: {len(cfg.filter_obj_ids)}')
 
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
@@ -163,6 +154,7 @@ def main(cfg : DictConfig) -> None:
                                                        limit_images=cfg.limit_images,
                                                        anno=anno,
                                                        filter_obj_ids=cfg.filter_obj_ids,
+                                                       filter_objkeys=filter_objkeys,
                                                        raster_cache=raster_cache)
 
         if cfg.create_visiblity_cache_only:
@@ -296,6 +288,10 @@ def main(cfg : DictConfig) -> None:
                 for _, (obj_id, obj_bbox) in enumerate(tqdm(bboxes_2d.items(), desc='obj', leave=False)):
                     if obj_id == 0:
                         continue
+
+                    if filter_objkeys is not None:
+                        if (scene_id, obj_id) not in filter_objkeys:
+                            continue
 
                     if cfg.check_visibility:
                         # no viz data for this image -> skip

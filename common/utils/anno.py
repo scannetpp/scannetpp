@@ -98,6 +98,7 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
                 limit_images=None, anno=None, filter_obj_ids=None,
+                filter_objkeys=None,
                 raster_cache=None):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
@@ -112,6 +113,7 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
                                         undistort_dslr=undistort_dslr, 
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
                                         limit_images=limit_images, filter_obj_ids=filter_obj_ids,
+                                        filter_objkeys=filter_objkeys,
                                         raster_cache=raster_cache)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
@@ -194,7 +196,7 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
 def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor, 
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
-                filter_obj_ids=None, raster_cache=None):
+                filter_obj_ids=None, filter_objkeys=None, raster_cache=None):
     '''
     undistort_dslr: if True, undistort the dslr images and then compute visibility
     crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
@@ -280,6 +282,11 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
         
             if filter_obj_ids and obj_id not in filter_obj_ids:
                 continue
+
+            if filter_objkeys is not None:
+                # process only the specified objects
+                if (scene.scene_id, obj_id) not in filter_objkeys:
+                    continue
 
             obj_mask_3d = anno['vertex_obj_ids'] == obj_id
             obj_verts_ndx = np.where(obj_mask_3d)[0] # indices of vertices in this object
