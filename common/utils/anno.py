@@ -97,10 +97,10 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
     return pix_sem_ids
 
-def get_visiblity_from_cache(scene, cache_dir, image_type, subsample_factor, 
+def get_visiblity_from_cache(scene, cache_dir, image_type,
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
-                limit_images=None, anno=None, filter_obj_ids=None,
+                anno=None, filter_obj_ids=None,
                 filter_objkeys=None,
                 raster_cache=None,
                 n_proc=8):
@@ -112,11 +112,10 @@ def get_visiblity_from_cache(scene, cache_dir, image_type, subsample_factor,
         if anno is None:
             anno = load_anno_wrapper(scene)
         visiblity_data = compute_visiblity(scene, anno, image_type, 
-                                        subsample_factor, 
                                         colmap_camera, image_list, distort_params, mesh,
                                         undistort_dslr=undistort_dslr, 
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
-                                        limit_images=limit_images, filter_obj_ids=filter_obj_ids,
+                                        filter_obj_ids=filter_obj_ids,
                                         filter_objkeys=filter_objkeys,
                                         raster_cache=raster_cache,
                                         n_proc=n_proc)
@@ -198,9 +197,9 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, image_type, subsample_factor, 
+def compute_visiblity(scene, anno, image_type,
                 colmap_camera, image_list, distort_params, mesh,
-                undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
+                undistort_dslr=True, crop_undistorted_dslr_factor=None,
                 filter_obj_ids=None, filter_objkeys=None, raster_cache=None,
                 n_proc=8):
     '''
@@ -242,27 +241,32 @@ def compute_visiblity(scene, anno, image_type, subsample_factor,
     else:
         undistort_map1, undistort_map2 = None, None
 
-    # Process images in parallel using joblib
-    results = Parallel(n_jobs=n_proc, verbose=10)(
-        delayed(create_vizcache_one_image)(
-            image_ndx,
-            image_name,
-            raster_cache,
-            img_height,
-            img_width,
-            image_type,
-            undistort_dslr,
-            crop_undistorted_dslr_factor,
-            undistort_map1,
-            undistort_map2,
-            faces, #nparray, shared memory
-            anno['vertex_obj_ids'], 
-            scene.scene_id,
-            filter_obj_ids,
-            filter_objkeys,
+    if n_proc is None or n_proc <= 1:
+        results = []
+        for image_ndx, image_name in enumerate(image_list):
+            results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width, image_type, undistort_dslr, crop_undistorted_dslr_factor, undistort_map1, undistort_map2, faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, filter_objkeys))
+    else:
+        # Process images in parallel using joblib
+        results = Parallel(n_jobs=n_proc, verbose=10)(
+            delayed(create_vizcache_one_image)(
+                image_ndx,
+                image_name,
+                raster_cache,
+                img_height,
+                img_width,
+                image_type,
+                undistort_dslr,
+                crop_undistorted_dslr_factor,
+                undistort_map1,
+                undistort_map2,
+                faces, #nparray, shared memory
+                anno['vertex_obj_ids'], 
+                scene.scene_id,
+                filter_obj_ids,
+                filter_objkeys,
+            )
+            for image_ndx, image_name in enumerate(image_list)
         )
-        for image_ndx, image_name in enumerate(image_list)
-    )
 
     print(f'Num results: {len(results)}')
 
@@ -330,17 +334,15 @@ def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, i
         if crop_undistorted_dslr_factor is not None:
             pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
 
-    valid_pix_to_face = pix_to_face[:, :] != -1
-    face_ndx = pix_to_face[valid_pix_to_face]
-    
-    # get obj ids on 2d image - compute manually since we can't pass mesh object
-    valid_pix_to_face_mask = pix_to_face != -1
-    pix_obj_ids = np.zeros_like(pix_to_face, dtype=np.int32)
-    pix_obj_ids[valid_pix_to_face_mask] = vertex_obj_ids[mesh_triangles[pix_to_face[valid_pix_to_face_mask]][:, 0]]
+    pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vertex_obj_ids, faces)
     
     # get objid -> bbox x,y,w,h 
     bboxes_2d = get_bboxes_2d(pix_obj_ids)
 
+
+    # faces in this image -> vertices in this image -> obj ids on these vertices
+    valid_pix_to_face =  pix_to_face[:, :] != -1
+    face_ndx = pix_to_face[valid_pix_to_face]
     faces_in_img = faces[face_ndx]
     # get the set of vertices visible from this image 
     img_verts = np.unique(faces_in_img)
@@ -364,10 +366,7 @@ def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, i
             continue
         # store total #vertices of object
         result['objects'][str(obj_id)] = {'num_total_vertices': len(obj_verts_ndx)}
-
-        # faces in this image -> vertices in this image
-        faces_in_img = faces[face_ndx]
-        img_verts = np.unique(faces_in_img)
+        
         # obj verts in this image
         intersection = np.intersect1d(obj_verts_ndx, img_verts)
         # frac of obj vertices visible in this image
@@ -487,7 +486,7 @@ def get_pixel_props_on_vtx(pix_to_face, pix_prop, mesh):
     return vtx_props, unique_vtx_ndx
 
 
-def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
+def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh_faces_np):
     '''
     pix_to_face: output of rasterization
     vtx_prop: some property on the vertices
@@ -496,8 +495,6 @@ def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
     allow storing n-dim features
     '''
     valid_pix_to_face =  pix_to_face[:, :] != -1
-
-    mesh_faces_np = np.array(mesh.triangles)
 
     # if the property is n dimensional (n,3), then pix_vtx_prop should have extra dimension
     if len(vtx_prop.shape) == 2:
