@@ -145,7 +145,7 @@ def main(cfg : DictConfig) -> None:
 
         if cfg.check_visibility:
             # create visibility cache to pick topk images where an object is visible
-            visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, 
+            visibility_data = get_visiblity_from_cache(scene, cfg.visiblity_cache_dir, 
                                                        cfg.image_type, 
                                                        cfg.subsample_factor, 
                                                        colmap_camera, image_list, distort_params, mesh,
