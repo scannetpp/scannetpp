@@ -96,7 +96,7 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
     return pix_sem_ids
 
-def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
+def get_visiblity_from_cache(scene, cache_dir, image_type, subsample_factor, 
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
                 limit_images=None, anno=None, filter_obj_ids=None,
@@ -110,7 +110,7 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
-        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type, 
+        visiblity_data = compute_visiblity(scene, anno, image_type, 
                                         subsample_factor, 
                                         colmap_camera, image_list, distort_params, mesh,
                                         undistort_dslr=undistort_dslr, 
@@ -197,7 +197,7 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor, 
+def compute_visiblity(scene, anno, image_type, subsample_factor, 
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
                 filter_obj_ids=None, filter_objkeys=None, raster_cache=None,
@@ -242,17 +242,7 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
     for image_ndx, image_name in enumerate(tqdm(image_list, desc='image')):
         visibility_data['images'][image_name]['objects'] = defaultdict(dict)
 
-        if raster_cache is not None:
-            pix_to_face = raster_cache['pix_to_face'][image_ndx]
-        else:
-            # load rasterized output or do it now
-            if rasterout_dir is not None:
-                rasterout_path = rasterout_dir / scene.scene_id / f'{image_name}.pth'
-                raster_out_dict = torch.load(rasterout_path)
-                pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
-                # zbuf = raster_out_dict['zbuf'].squeeze().cpu()
-            else:
-                raise ValueError(f'Rasterization not found for {image_name}')
+        pix_to_face = raster_cache['pix_to_face'][image_ndx]
 
         rasterized_dims = list(pix_to_face.shape)
 
@@ -267,7 +257,6 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
 
             if crop_undistorted_dslr_factor is not None:
                 pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
-                # zbuf = crop_undistorted_dslr_image(zbuf, crop_undistorted_dslr_factor)
                 
         valid_pix_to_face =  pix_to_face[:, :] != -1
         face_ndx = pix_to_face[valid_pix_to_face]
