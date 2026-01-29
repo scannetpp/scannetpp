@@ -243,8 +243,9 @@ def compute_visiblity(scene, anno, image_type,
 
     if n_proc is None or n_proc <= 1:
         results = []
-        for image_ndx, image_name in enumerate(image_list):
-            results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width, image_type, undistort_dslr, crop_undistorted_dslr_factor, undistort_map1, undistort_map2, faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, filter_objkeys))
+        with Timer(name='create_vizcache', text="{name} done in {seconds:.4f}s"):
+            for image_ndx, image_name in enumerate(image_list):
+                results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width, image_type, undistort_dslr, crop_undistorted_dslr_factor, undistort_map1, undistort_map2, faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, filter_objkeys))
     else:
         # Process images in parallel using joblib
         results = Parallel(n_jobs=n_proc, verbose=10)(
@@ -268,8 +269,6 @@ def compute_visiblity(scene, anno, image_type,
             for image_ndx, image_name in enumerate(image_list)
         )
 
-    print(f'Num results: {len(results)}')
-
     # Merge results
     for result in results:
         image_name = result['image_name']
@@ -277,9 +276,6 @@ def compute_visiblity(scene, anno, image_type,
         # Merge object data (num_total_vertices)
         for obj_id, obj_data in result['objects'].items():
             visibility_data['objects'][obj_id].update(obj_data)
-
-    import sys
-    sys.exit()
 
     return visibility_data
 
