@@ -96,6 +96,7 @@ def main(cfg : DictConfig) -> None:
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
         mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
+        mesh_faces_np = np.array(mesh.triangles)
 
         obj_ids = np.unique(vtx_obj_ids)
         # remove <= 0
@@ -135,6 +136,7 @@ def main(cfg : DictConfig) -> None:
         if cfg.get('limit_images'):
             print(f'Limiting to {cfg.limit_images} images')
             image_list = image_list[:cfg.limit_images]
+            poses = [poses[i] for i in range(cfg.limit_images)]
 
         raster_cache = None
         if cfg.rasterize_lib == 'nvdiffrast':
@@ -147,11 +149,9 @@ def main(cfg : DictConfig) -> None:
             # create visibility cache to pick topk images where an object is visible
             visibility_data = get_visiblity_from_cache(scene, cfg.visiblity_cache_dir, 
                                                        cfg.image_type, 
-                                                       cfg.subsample_factor, 
                                                        colmap_camera, image_list, distort_params, mesh,
                                                        cfg.undistort_dslr, 
                                                        cfg.crop_undistorted_dslr_factor,
-                                                       limit_images=cfg.limit_images,
                                                        anno=anno,
                                                        filter_obj_ids=cfg.filter_obj_ids,
                                                        filter_objkeys=filter_objkeys,
@@ -238,7 +238,7 @@ def main(cfg : DictConfig) -> None:
                     img = crop_undistorted_dslr_image(img, cfg.crop_undistorted_dslr_factor)
 
             # get object IDs on image
-            pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh)
+            pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh_faces_np)
 
             if cfg.get('filter_obj_ids'):
                 pix_obj_ids = np.where(np.isin(pix_obj_ids, cfg.filter_obj_ids), pix_obj_ids, -1)
