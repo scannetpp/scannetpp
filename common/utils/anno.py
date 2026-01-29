@@ -1,6 +1,8 @@
 '''
 utils related to 3d semantic+instance annotations
 '''
+from codetiming import Timer
+
 try:
     # not required for all functions
     from torch_scatter import scatter_mean
@@ -99,7 +101,8 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
                 undistort_dslr=None, crop_undistorted_dslr_factor=None, 
                 limit_images=None, anno=None, filter_obj_ids=None,
                 filter_objkeys=None,
-                raster_cache=None):
+                raster_cache=None,
+                n_proc=8):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
@@ -114,7 +117,8 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
                                         limit_images=limit_images, filter_obj_ids=filter_obj_ids,
                                         filter_objkeys=filter_objkeys,
-                                        raster_cache=raster_cache)
+                                        raster_cache=raster_cache,
+                                        n_proc=n_proc)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
         write_json(cached_path, visiblity_data)
@@ -196,7 +200,8 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
 def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor, 
                 colmap_camera, image_list, distort_params, mesh,
                 undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
-                filter_obj_ids=None, filter_objkeys=None, raster_cache=None):
+                filter_obj_ids=None, filter_objkeys=None, raster_cache=None,
+                n_proc=8):
     '''
     undistort_dslr: if True, undistort the dslr images and then compute visibility
     crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
@@ -306,13 +311,6 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
             obj_pixel_mask = pix_obj_ids == obj_id
             num_obj_pixels = np.sum(obj_pixel_mask)
 
-            # obj_zbuf = zbuf.squeeze()[obj_pixel_mask.squeeze()]
-            # keep only the >= 0 values
-            # obj_zbuf = obj_zbuf[obj_zbuf >= 0]
-
-            # zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
-            # zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
-
             # string keys for json
             visibility_data['images'][image_name]['objects'][str(obj_id)] = {
                 'bbox_2d': list(obj_bbox),
@@ -320,8 +318,6 @@ def compute_visiblity(scene, anno, rasterout_dir, image_type, subsample_factor,
                 'visible_vertices_frac': float(visible_frac),
                 'num_visible_pixels': int(num_obj_pixels),
                 'visible_pixels_frac': float(num_obj_pixels / (img_height * img_width)),
-                # 'zbuf_min': float(zbuf_min),
-                # 'zbuf_max': float(zbuf_max)
             }
 
     return visibility_data

@@ -155,7 +155,8 @@ def main(cfg : DictConfig) -> None:
                                                        anno=anno,
                                                        filter_obj_ids=cfg.filter_obj_ids,
                                                        filter_objkeys=filter_objkeys,
-                                                       raster_cache=raster_cache)
+                                                       raster_cache=raster_cache,
+                                                       n_proc=cfg.n_proc)
 
         if cfg.create_visiblity_cache_only:
             print(f'Created visibility cache for {scene_id}')
@@ -419,4 +420,5 @@ def main(cfg : DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with Timer(name='semantics_2d.main', text="{name} done in {seconds:.4f}s"):
+        main()
