@@ -469,7 +469,7 @@ def rasterize_mesh_nvdiffrast_batch(mesh, img_height, img_width, poses, intrinsi
 
     return raster_out_dict
 
-def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_list, intrinsic, distort_params, batch_size=32):
+def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_list, intrinsic, distort_params, batch_size=16):
     """
     Memory-efficient batch rasterization for large lists of camera poses.
     Processes poses in smaller batches to avoid GPU memory issues.
