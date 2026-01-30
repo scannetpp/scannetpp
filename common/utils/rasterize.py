@@ -259,7 +259,7 @@ def project_fisheye_single(v_world, pose, intrinsic, distort_params, img_height,
     # Return [1, N, 4] as Nvdiffrast expects a batch dimension
     return torch.stack([u_clip, v_clip, z_clip, torch.ones_like(z)], dim=-1).unsqueeze(0)
 
-def project_fisheye_batch(v_world, poses, intrinsic, distort_params, img_height, img_width):
+def project_batch(v_world, poses, intrinsic, distort_params, img_height, img_width):
     """
     Transforms world-space vertices into Nvdiffrast-compatible clip space for a batch of poses.
     
@@ -267,7 +267,7 @@ def project_fisheye_batch(v_world, poses, intrinsic, distort_params, img_height,
         v_world: [N, 3] world-space vertices
         poses: [B, 4, 4] batch of camera poses
         intrinsic: [3, 3] camera intrinsic matrix
-        distort_params: [4] distortion parameters (k1, k2, k3, k4)
+        distort_params: [4] distortion parameters (k1, k2, k3, k4) or None
         img_height: int, image height
         img_width: int, image width
     
@@ -281,8 +281,6 @@ def project_fisheye_batch(v_world, poses, intrinsic, distort_params, img_height,
         poses = torch.Tensor(poses).to(device)
     if not torch.is_tensor(intrinsic):
         intrinsic = torch.Tensor(intrinsic).to(device)
-    if not torch.is_tensor(distort_params):
-        distort_params = torch.Tensor(distort_params).to(device)
     
     B = poses.shape[0]
     N = v_world.shape[0]
@@ -297,16 +295,20 @@ def project_fisheye_batch(v_world, poses, intrinsic, distort_params, img_height,
     
     x, y, z = v_cam[:, :, 0], v_cam[:, :, 1], v_cam[:, :, 2]  # each [B, N]
     
-    # 2. Apply Fisheye (Kannala-Brandt model) for all poses
-    r = torch.sqrt(x**2 + y**2) + 1e-10  # [B, N]
-    theta = torch.atan2(r, z)  # [B, N]
-    
-    t2 = theta**2  # [B, N]
-    k1, k2, k3, k4 = distort_params[:4]
-    theta_d = theta * (1 + k1*t2 + k2*(t2**2) + k3*(t2**3) + k4*(t2**4))  # [B, N]
-    
-    # 3. Project to Image Plane
-    scale = theta_d / r  # [B, N]
+    if distort_params is not None:
+        # 2. Apply Fisheye (Kannala-Brandt model) for all poses
+        r = torch.sqrt(x**2 + y**2) + 1e-10  # [B, N]
+        theta = torch.atan2(r, z)  # [B, N]
+        
+        t2 = theta**2  # [B, N]
+        k1, k2, k3, k4 = distort_params[:4]
+        theta_d = theta * (1 + k1*t2 + k2*(t2**2) + k3*(t2**3) + k4*(t2**4))  # [B, N]
+        
+        # 3. Project to Image Plane
+        scale = theta_d / r  # [B, N]
+    else:
+        scale = 1.0
+        
     u = scale * x * intrinsic[0, 0] + intrinsic[0, 2]  # [B, N]
     v = scale * y * intrinsic[1, 1] + intrinsic[1, 2]  # [B, N]
     
@@ -323,7 +325,9 @@ def project_fisheye_batch(v_world, poses, intrinsic, distort_params, img_height,
     z_clip = (z - z_min) / z_range  # [B, N]
     
     # Mask invalid points (behind camera or outside FOV)
-    mask = (z < 0.01) | (theta > (np.pi / 2.0))  # [B, N]
+    mask = (z < 0.01)  # [B, N]
+    if distort_params is not None:
+        mask = mask | (theta > (np.pi / 2.0))
     
     # Set to inf in clip space to avoid rasterization
     inf_val = torch.tensor(float('inf'), device=device)
@@ -469,7 +473,7 @@ def rasterize_mesh_nvdiffrast_batch(mesh, img_height, img_width, poses, intrinsi
 
     return raster_out_dict
 
-def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_list, intrinsic, distort_params, batch_size=16):
+def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_list, intrinsic, distort_params=None, batch_size=16):
     """
     Memory-efficient batch rasterization for large lists of camera poses.
     Processes poses in smaller batches to avoid GPU memory issues.
@@ -514,7 +518,10 @@ def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_lis
     
     # Convert intrinsic and distort_params to tensors once
     intrinsic_tensor = torch.Tensor(intrinsic).to(device)
-    distort_params_tensor = torch.Tensor(distort_params).to(device)
+    if distort_params is not None:
+        distort_params_tensor = torch.Tensor(distort_params).to(device)
+    else:
+        distort_params_tensor = None
     
     ctx = dr.RasterizeCudaContext()
     
@@ -528,7 +535,7 @@ def rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses_lis
             
             # Project vertices to clip space for this batch
             # v_clip shape: [B, N, 4] where B is batch_end - batch_start
-            v_clip = project_fisheye_batch(
+            v_clip = project_batch(
                 v_pos, batch_poses_tensor, intrinsic_tensor, 
                 distort_params_tensor, img_height, img_width
             )

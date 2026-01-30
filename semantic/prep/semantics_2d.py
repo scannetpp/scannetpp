@@ -132,6 +132,8 @@ def main(cfg : DictConfig) -> None:
             undistort_map1, undistort_map2 = cv2.fisheye.initUndistortRectifyMap(
                 intrinsic, distort_params, np.eye(3), undistort_intrinsic, (img_width, img_height), cv2.CV_32FC1
             )
+            # get dims of undistorted image
+            img_height_undistort, img_width_undistort = int(undistort_intrinsic[1, 2]*2), int(undistort_intrinsic[0, 2]*2)
 
         if cfg.get('limit_images'):
             print(f'Limiting to {cfg.limit_images} images')
@@ -143,14 +145,20 @@ def main(cfg : DictConfig) -> None:
             # rasterize all the images at once and store the pix2face, reuse
             with Timer(name='Rasterizing', text="{name} done in {seconds:.4f}s"):
                 print(f'Rasterizing {len(image_list)} images...')
-                raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height, img_width, poses, intrinsic, distort_params)
+                if cfg.image_type == 'dslr':
+                    if cfg.undistort_dslr:
+                        # use the undistorted intrinsics and img height and width directly
+                        # get undistorted pix2face
+                        raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height_undistort, img_width_undistort, poses, undistort_intrinsic)
+                    else:
+                        raise NotImplementedError(f'Undistortion not supported for {cfg.image_type} and original distorted images')
+                
 
         if cfg.check_visibility:
             # create visibility cache to pick topk images where an object is visible
             visibility_data = get_visiblity_from_cache(scene, cfg.visiblity_cache_dir, 
                                                        cfg.image_type, 
-                                                       colmap_camera, image_list, distort_params, mesh,
-                                                       cfg.undistort_dslr, 
+                                                       colmap_camera, image_list, mesh,
                                                        cfg.crop_undistorted_dslr_factor,
                                                        anno=anno,
                                                        filter_obj_ids=cfg.filter_obj_ids,
@@ -176,11 +184,7 @@ def main(cfg : DictConfig) -> None:
                 print(f'Image not found: {img_path}, skipping')
                 continue
             
-            try:
-                img = load_image(img_path) 
-            except:
-                print(f'Error loading image: {img_path}, skipping')
-                continue
+            img = load_image(img_path) 
 
             if raster_cache is not None:
                 pix_to_face = raster_cache['pix_to_face'][image_ndx]
@@ -225,11 +229,7 @@ def main(cfg : DictConfig) -> None:
             pix_to_face = pix_to_face.numpy()
 
             if undistort_map1 is not None and undistort_map2 is not None:
-                # apply undistortion to rasterization (nearest neighbor), image (linear)
-                pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
-                    interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
-                )
-                # img is np
+                # NOTE: rasterization is already undistorted
                 img = cv2.remap(img, undistort_map1, undistort_map2,
                     interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
                 )

@@ -98,8 +98,8 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
     return pix_sem_ids
 
 def get_visiblity_from_cache(scene, cache_dir, image_type,
-                colmap_camera, image_list, distort_params, mesh,
-                undistort_dslr=None, crop_undistorted_dslr_factor=None, 
+                colmap_camera, image_list, mesh,
+                crop_undistorted_dslr_factor=None, 
                 anno=None, filter_obj_ids=None,
                 filter_objkeys=None,
                 raster_cache=None,
@@ -112,8 +112,7 @@ def get_visiblity_from_cache(scene, cache_dir, image_type,
         if anno is None:
             anno = load_anno_wrapper(scene)
         visiblity_data = compute_visiblity(scene, anno, image_type, 
-                                        colmap_camera, image_list, distort_params, mesh,
-                                        undistort_dslr=undistort_dslr, 
+                                        colmap_camera, image_list, mesh,
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
                                         filter_obj_ids=filter_obj_ids,
                                         filter_objkeys=filter_objkeys,
@@ -198,8 +197,8 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
 
 
 def compute_visiblity(scene, anno, image_type,
-                colmap_camera, image_list, distort_params, mesh,
-                undistort_dslr=True, crop_undistorted_dslr_factor=None,
+                colmap_camera, image_list, mesh,
+                crop_undistorted_dslr_factor=None,
                 filter_obj_ids=None, filter_objkeys=None, raster_cache=None,
                 n_proc=8):
     '''
@@ -235,17 +234,15 @@ def compute_visiblity(scene, anno, image_type,
     intrinsic = camera_to_intrinsic(colmap_camera)
     img_height, img_width = colmap_camera.height, colmap_camera.width
 
-    if image_type == 'dslr' and undistort_dslr:
-        undistort_intrinsic = compute_undistort_intrinsic(intrinsic, img_height, img_width, distort_params)
-        undistort_map1, undistort_map2 = get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width)
-    else:
-        undistort_map1, undistort_map2 = None, None
-
     if n_proc is None or n_proc <= 1:
         results = []
         with Timer(name='create_vizcache', text="{name} done in {seconds:.4f}s"):
             for image_ndx, image_name in enumerate(image_list):
-                results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width, image_type, undistort_dslr, crop_undistorted_dslr_factor, undistort_map1, undistort_map2, faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, filter_objkeys))
+                results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, 
+                img_height, img_width, image_type, 
+                 crop_undistorted_dslr_factor, 
+                 faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, 
+                 filter_objkeys))
     else:
         # Process images in parallel using joblib
         results = Parallel(n_jobs=n_proc, verbose=10)(
@@ -256,10 +253,7 @@ def compute_visiblity(scene, anno, image_type,
                 img_height,
                 img_width,
                 image_type,
-                undistort_dslr,
                 crop_undistorted_dslr_factor,
-                undistort_map1,
-                undistort_map2,
                 faces, #nparray, shared memory
                 anno['vertex_obj_ids'], 
                 scene.scene_id,
@@ -281,8 +275,8 @@ def compute_visiblity(scene, anno, image_type,
 
 
 def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width,
-                              image_type, undistort_dslr, crop_undistorted_dslr_factor,
-                              undistort_map1, undistort_map2, faces, vertex_obj_ids,
+                              image_type, crop_undistorted_dslr_factor,
+                              faces, vertex_obj_ids,
                               scene_id, filter_obj_ids, filter_objkeys):
     '''
     Process a single image and return visibility data for that image.
@@ -294,9 +288,7 @@ def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, i
         raster_cache: dictionary containing 'pix_to_face' tensor
         img_height, img_width: image dimensions
         image_type: type of image ('dslr' or other)
-        undistort_dslr: whether to undistort DSLR images
         crop_undistorted_dslr_factor: factor for cropping undistorted images
-        undistort_map1, undistort_map2: undistortion maps (can be None)
         faces: numpy array of mesh faces
         vertex_obj_ids: numpy array of vertex object IDs
         mesh_triangles: numpy array of mesh triangles (F, 3)
@@ -324,17 +316,13 @@ def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, i
 
     pix_to_face = pix_to_face.numpy()
 
-    if image_type == 'dslr' and undistort_dslr:  # undistort
-        pix_to_face = undistort_pix_to_face(pix_to_face, undistort_map1, undistort_map2)
-
-        if crop_undistorted_dslr_factor is not None:
-            pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
+    if crop_undistorted_dslr_factor is not None:
+        pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
 
     pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vertex_obj_ids, faces)
     
     # get objid -> bbox x,y,w,h 
     bboxes_2d = get_bboxes_2d(pix_obj_ids)
-
 
     # faces in this image -> vertices in this image -> obj ids on these vertices
     valid_pix_to_face =  pix_to_face[:, :] != -1
