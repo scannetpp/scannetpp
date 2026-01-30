@@ -307,7 +307,8 @@ def project_batch(v_world, poses, intrinsic, distort_params, img_height, img_wid
         # 3. Project to Image Plane
         scale = theta_d / r  # [B, N]
     else:
-        scale = 1.0
+        # Standard pinhole projection: divide by z
+        scale = 1.0 / (z + 1e-10)  # [B, N] - add small epsilon to avoid division by zero
         
     u = scale * x * intrinsic[0, 0] + intrinsic[0, 2]  # [B, N]
     v = scale * y * intrinsic[1, 1] + intrinsic[1, 2]  # [B, N]
@@ -408,64 +409,6 @@ def rasterize_mesh_nvdiffrast(mesh, img_height, img_width, pose, intrinsic, dist
     # Remove batch dimension if single pose for backward compatibility
     if not is_batch:
         pixel_to_face = pixel_to_face[0]  # [H, W]
-
-    raster_out_dict = {
-        'pix_to_face': pixel_to_face.cpu(),
-    }
-
-    return raster_out_dict
-
-def rasterize_mesh_nvdiffrast_batch(mesh, img_height, img_width, poses, intrinsic, distort_params):
-    """
-    Batch rasterization for multiple camera poses using nvdiffrast.
-    
-    Args:
-        mesh: open3d mesh
-        img_height, img_width: int
-        poses: [B, 4, 4] batch of camera poses with R and t
-        intrinsic: [3, 3] camera intrinsic matrix with fx, fy, cx, cy
-        distort_params: [4] array of distortion parameters
-    
-    Returns:
-        raster_out_dict: dict with 'pix_to_face' of shape [B, H, W]
-    """
-    device = torch.device("cuda:0")
-
-    v_pos = torch.Tensor(np.array(mesh.vertices)).to(device)
-    faces = torch.Tensor(np.array(mesh.triangles)).to(device).to(torch.int32)
-    img_dims = (img_height, img_width)
-    
-    B = poses.shape[0] if len(poses.shape) == 3 else 1
-    if len(poses.shape) == 2:
-        poses = poses.unsqueeze(0)
-
-    ctx = dr.RasterizeCudaContext()
-
-    with torch.no_grad():
-        # vertex locations in clip space, with distortion for all poses
-        v_clip = project_fisheye_batch(
-            v_pos, torch.Tensor(poses).to(device), torch.Tensor(intrinsic).to(device), 
-            torch.Tensor(distort_params).to(device), img_height, img_width
-        )
-        # v_clip shape: [B, N, 4]
-
-        # rasterize mesh into image for all poses
-        # v_clip: [B, N, 4] clipped vertices
-        # faces: [ntriangles, 3]
-        # img_dims: (height, width)
-        # grad_db: False, no gradients
-        rast, _ = dr.rasterize(
-            ctx, v_clip, faces, img_dims, 
-            grad_db=False
-        )
-        # rast shape: [B, H, W, 4] where last dim is (u, v, z/w, triangle_id)
-
-        # Extract face IDs (0-indexed, -1 for background)
-        # (u, v, z/w, triangle_id) -> [B, H, W]
-        pixel_to_face = rast[..., 3].int() - 1  # [B, H, W]
-
-    # flip the rows for each image in the batch
-    pixel_to_face = torch.flip(pixel_to_face, dims=[1])  # flip along height dimension
 
     raster_out_dict = {
         'pix_to_face': pixel_to_face.cpu(),
