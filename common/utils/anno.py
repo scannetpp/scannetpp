@@ -1,11 +1,12 @@
 '''
 utils related to 3d semantic+instance annotations
 '''
+from codetiming import Timer
+
 try:
     # not required for all functions
     from torch_scatter import scatter_mean
 except ImportError:
-    print('torch_scatter not found')
     pass
 
 try:
@@ -24,12 +25,14 @@ import json
 import numpy as np
 from pathlib import Path
 from tqdm import tqdm
+from joblib import Parallel, delayed
+from loguru import logger
 
 from common.utils.dslr import crop_undistorted_dslr_image
 
 from common.utils.colmap import camera_to_intrinsic, get_camera_images_poses
 from common.utils.dslr import compute_undistort_intrinsic, get_undistort_maps
-from common.utils.rasterize import undistort_rasterization, upsample_rasterization
+from common.utils.rasterize import undistort_rasterization, upsample_rasterization, undistort_pix_to_face, upsample_pix_to_face
 from common.file_io import write_json, load_json
 
 def get_top_images_from_visibility(obj_id, visibility_data):
@@ -94,9 +97,13 @@ def get_sem_ids_on_2d(pix_obj_ids, anno, semantic_classes, ignore_label=-1):
 
     return pix_sem_ids
 
-def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample_factor, 
-                undistort_dslr=None, crop_undistorted_dslr_factor=None, 
-                limit_images=None, anno=None, filter_obj_ids=None):
+def get_visiblity_from_cache(scene, cache_dir, image_type,
+                colmap_camera, image_list, mesh,
+                crop_undistorted_dslr_factor=None, 
+                anno=None, filter_obj_ids=None,
+                filter_objkeys=None,
+                raster_cache=None,
+                n_proc=8):
     cached_path = Path(cache_dir) / f'{scene.scene_id}.json'
     if cached_path.exists():
         print(f'Loading visibility data from cache: {cached_path}')
@@ -104,10 +111,13 @@ def get_visiblity_from_cache(scene, raster_dir, cache_dir, image_type, subsample
     else:
         if anno is None:
             anno = load_anno_wrapper(scene)
-        visiblity_data = compute_visiblity(scene, anno, raster_dir, image_type=image_type, 
-                                        subsample_factor=subsample_factor, undistort_dslr=undistort_dslr, 
+        visiblity_data = compute_visiblity(scene, anno, image_type, 
+                                        colmap_camera, image_list, mesh,
                                         crop_undistorted_dslr_factor=crop_undistorted_dslr_factor,
-                                        limit_images=limit_images, filter_obj_ids=filter_obj_ids)
+                                        filter_obj_ids=filter_obj_ids,
+                                        filter_objkeys=filter_objkeys,
+                                        raster_cache=raster_cache,
+                                        n_proc=n_proc)
         cached_path.parent.mkdir(parents=True, exist_ok=True)
         print(f'Saving visibility data to cache: {cached_path}')
         write_json(cached_path, visiblity_data)
@@ -186,9 +196,11 @@ def compute_best_views(scene, raster_dir, image_type, subsample_factor, undistor
     return best_views
 
 
-def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor, 
-                undistort_dslr=True, crop_undistorted_dslr_factor=None, limit_images=None, 
-                filter_obj_ids=None):
+def compute_visiblity(scene, anno, image_type,
+                colmap_camera, image_list, mesh,
+                crop_undistorted_dslr_factor=None,
+                filter_obj_ids=None, filter_objkeys=None, raster_cache=None,
+                n_proc=8):
     '''
     undistort_dslr: if True, undistort the dslr images and then compute visibility
     crop_undistorted_dslr_factor: if not None, crop the undistorted dslr images on the left and right and then compute visibility
@@ -210,6 +222,7 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
                 zbuf_max: max zbuf value of the object in the image
     '''
     print(f'Computing visibility for {scene.scene_id}')
+    print(f'Num images for visibility check: {len(image_list)}')
 
     visibility_data = {
         'scene_id': scene.scene_id,
@@ -217,109 +230,145 @@ def compute_visiblity(scene, anno, raster_dir, image_type, subsample_factor,
         'images': defaultdict(dict)
     }
 
-    mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
     faces = np.array(mesh.triangles)
-
-    # get list of images
-    # get the list of iphone/dslr images and poses
-    colmap_camera, image_list, _, distort_params = get_camera_images_poses(scene, subsample_factor, image_type)
-    print(f'Num images for visibility check: {len(image_list)}')
-    if limit_images is not None:
-        image_list = image_list[:limit_images]
-        print(f'Limiting viz check to {limit_images} images')
-    # keep first 4 elements
-    distort_params = distort_params[:4]
-
     intrinsic = camera_to_intrinsic(colmap_camera)
     img_height, img_width = colmap_camera.height, colmap_camera.width
 
-    if image_type == 'dslr' and undistort_dslr:
-        undistort_intrinsic = compute_undistort_intrinsic(intrinsic, img_height, img_width, distort_params)
-        undistort_map1, undistort_map2 = get_undistort_maps(intrinsic, distort_params, undistort_intrinsic, img_height, img_width)
+    if n_proc is None or n_proc <= 1:
+        results = []
+        with Timer(name='create_vizcache', text="{name} done in {seconds:.4f}s"):
+            for image_ndx, image_name in enumerate(image_list):
+                results.append(create_vizcache_one_image(image_ndx, image_name, raster_cache, 
+                img_height, img_width, image_type, 
+                 crop_undistorted_dslr_factor, 
+                 faces, anno['vertex_obj_ids'], scene.scene_id, filter_obj_ids, 
+                 filter_objkeys))
+    else:
+        # Process images in parallel using joblib
+        results = Parallel(n_jobs=n_proc, verbose=10)(
+            delayed(create_vizcache_one_image)(
+                image_ndx,
+                image_name,
+                raster_cache,
+                img_height,
+                img_width,
+                image_type,
+                crop_undistorted_dslr_factor,
+                faces, #nparray, shared memory
+                anno['vertex_obj_ids'], 
+                scene.scene_id,
+                filter_obj_ids,
+                filter_objkeys,
+            )
+            for image_ndx, image_name in enumerate(image_list)
+        )
 
-    # for each image
-    for image_name in tqdm(image_list, desc='image'):
-        visibility_data['images'][image_name]['objects'] = defaultdict(dict)
-
-        # load rasterization
-        rasterout_path = raster_dir / scene.scene_id / f'{image_name}.pth'
-        raster_out_dict = torch.load(rasterout_path)
-
-        pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
-        zbuf = raster_out_dict['zbuf'].squeeze().cpu()
-
-        rasterized_dims = list(pix_to_face.shape)
-
-        # upsample rasterization to the image dims
-        if rasterized_dims != [img_height, img_width]: # upsample
-            pix_to_face, zbuf = upsample_rasterization(pix_to_face, zbuf, img_height, img_width)
-
-        pix_to_face = pix_to_face.numpy()
-
-        if image_type == 'dslr' and undistort_dslr: # undistort
-            pix_to_face, zbuf = undistort_rasterization(pix_to_face, zbuf, undistort_map1, undistort_map2)
-
-            if crop_undistorted_dslr_factor is not None:
-                pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
-                zbuf = crop_undistorted_dslr_image(zbuf, crop_undistorted_dslr_factor)
-                
-        valid_pix_to_face =  pix_to_face[:, :] != -1
-        face_ndx = pix_to_face[valid_pix_to_face]
-        # get obj ids on 2d image
-        pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, anno['vertex_obj_ids'], mesh)
-        # get objid -> bbox x,y,w,h 
-        bboxes_2d = get_bboxes_2d(pix_obj_ids)
-
-        faces_in_img = faces[face_ndx]
-        # get the set of vertices visible from this image 
-        img_verts = np.unique(faces_in_img)
-
-        # get all required stats per object visible in the image
-        for (obj_id, obj_bbox) in tqdm(bboxes_2d.items(), desc='obj', leave=False):
-            if obj_id <= 0:
-                continue
-        
-            if filter_obj_ids is not None and obj_id not in filter_obj_ids:
-                continue
-
-            obj_mask_3d = anno['vertex_obj_ids'] == obj_id
-            obj_verts_ndx = np.where(obj_mask_3d)[0] # indices of vertices in this object
-            if len(obj_verts_ndx) == 0:
-                continue
-            # store total #vertices of object
-            visibility_data['objects'][str(obj_id)]['num_total_vertices'] = len(obj_verts_ndx)
-
-            # faces in this image -> vertices in this image
-            faces_in_img = faces[face_ndx]
-            img_verts = np.unique(faces_in_img)
-            # obj verts in this image
-            intersection = np.intersect1d(obj_verts_ndx, img_verts)
-            # frac of obj vertices visible in this image
-            visible_frac = len(intersection) / len(obj_verts_ndx)
-
-            obj_pixel_mask = pix_obj_ids == obj_id
-            num_obj_pixels = np.sum(obj_pixel_mask)
-
-            obj_zbuf = zbuf.squeeze()[obj_pixel_mask.squeeze()]
-            # keep only the >= 0 values
-            obj_zbuf = obj_zbuf[obj_zbuf >= 0]
-
-            zbuf_min = obj_zbuf.min().item() if len(obj_zbuf) > 0 else -1
-            zbuf_max = obj_zbuf.max().item() if len(obj_zbuf) > 0 else -1
-
-            # string keys for json
-            visibility_data['images'][image_name]['objects'][str(obj_id)] = {
-                'bbox_2d': list(obj_bbox),
-                'num_visible_vertices': len(intersection),
-                'visible_vertices_frac': float(visible_frac),
-                'num_visible_pixels': int(num_obj_pixels),
-                'visible_pixels_frac': float(num_obj_pixels / (img_height * img_width)),
-                'zbuf_min': float(zbuf_min),
-                'zbuf_max': float(zbuf_max)
-            }
+    # Merge results
+    for result in results:
+        image_name = result['image_name']
+        visibility_data['images'][image_name] = result['image_data']
+        # Merge object data (num_total_vertices)
+        for obj_id, obj_data in result['objects'].items():
+            visibility_data['objects'][obj_id].update(obj_data)
 
     return visibility_data
 
+
+def create_vizcache_one_image(image_ndx, image_name, raster_cache, img_height, img_width,
+                              image_type, crop_undistorted_dslr_factor,
+                              faces, vertex_obj_ids,
+                              scene_id, filter_obj_ids, filter_objkeys):
+    '''
+    Process a single image and return visibility data for that image.
+    This function is designed to be called by joblib.Parallel.
+    
+    Args:
+        image_ndx: index of the image in the list (used to index into raster_cache)
+        image_name: name of the image
+        raster_cache: dictionary containing 'pix_to_face' tensor
+        img_height, img_width: image dimensions
+        image_type: type of image ('dslr' or other)
+        crop_undistorted_dslr_factor: factor for cropping undistorted images
+        faces: numpy array of mesh faces
+        vertex_obj_ids: numpy array of vertex object IDs
+        mesh_triangles: numpy array of mesh triangles (F, 3)
+        scene_id: scene ID string
+        filter_obj_ids: list of object IDs to filter (can be None)
+        filter_objkeys: list of (scene_id, obj_id) tuples to filter (can be None)
+    
+    Returns:
+        dict with keys: 'image_name', 'image_data', 'objects'
+    '''
+    result = {
+        'image_name': image_name,
+        'image_data': {'objects': defaultdict(dict)},
+        'objects': {}
+    }
+
+    # Get pix_to_face for this image from raster_cache
+    pix_to_face = raster_cache['pix_to_face'][image_ndx]
+
+    rasterized_dims = list(pix_to_face.shape)
+
+    # upsample rasterization to the image dims
+    if rasterized_dims != [img_height, img_width]:  # upsample
+        pix_to_face = upsample_pix_to_face(pix_to_face, img_height, img_width)
+
+    pix_to_face = pix_to_face.numpy()
+
+    if crop_undistorted_dslr_factor is not None:
+        pix_to_face = crop_undistorted_dslr_image(pix_to_face, crop_undistorted_dslr_factor)
+
+    pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vertex_obj_ids, faces)
+    
+    # get objid -> bbox x,y,w,h 
+    bboxes_2d = get_bboxes_2d(pix_obj_ids)
+
+    # faces in this image -> vertices in this image -> obj ids on these vertices
+    valid_pix_to_face =  pix_to_face[:, :] != -1
+    face_ndx = pix_to_face[valid_pix_to_face]
+    faces_in_img = faces[face_ndx]
+    # get the set of vertices visible from this image 
+    img_verts = np.unique(faces_in_img)
+
+    # get all required stats per object visible in the image
+    for (obj_id, obj_bbox) in bboxes_2d.items():
+        if obj_id <= 0:
+            continue
+
+        if filter_obj_ids and obj_id not in filter_obj_ids:
+            continue
+
+        if filter_objkeys is not None:
+            # process only the specified objects
+            if (scene_id, obj_id) not in filter_objkeys:
+                continue
+
+        obj_mask_3d = vertex_obj_ids == obj_id
+        obj_verts_ndx = np.where(obj_mask_3d)[0]  # indices of vertices in this object
+        if len(obj_verts_ndx) == 0:
+            continue
+        # store total #vertices of object
+        result['objects'][str(obj_id)] = {'num_total_vertices': len(obj_verts_ndx)}
+        
+        # obj verts in this image
+        intersection = np.intersect1d(obj_verts_ndx, img_verts)
+        # frac of obj vertices visible in this image
+        visible_frac = len(intersection) / len(obj_verts_ndx)
+
+        obj_pixel_mask = pix_obj_ids == obj_id
+        num_obj_pixels = np.sum(obj_pixel_mask)
+
+        # string keys for json
+        result['image_data']['objects'][str(obj_id)] = {
+            'bbox_2d': list(obj_bbox),
+            'num_visible_vertices': len(intersection),
+            'visible_vertices_frac': float(visible_frac),
+            'num_visible_pixels': int(num_obj_pixels),
+            'visible_pixels_frac': float(num_obj_pixels / (img_height * img_width)),
+        }
+
+    return result
 
 def load_anno_wrapper(scene):
     anno = load_annotation(scene.scan_anno_json_path, bboxes_only=True, 
@@ -421,7 +470,7 @@ def get_pixel_props_on_vtx(pix_to_face, pix_prop, mesh):
     return vtx_props, unique_vtx_ndx
 
 
-def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
+def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh_faces_np):
     '''
     pix_to_face: output of rasterization
     vtx_prop: some property on the vertices
@@ -431,10 +480,11 @@ def get_vtx_prop_on_2d(pix_to_face, vtx_prop, mesh):
     '''
     valid_pix_to_face =  pix_to_face[:, :] != -1
 
-    mesh_faces_np = np.array(mesh.triangles)
-
-    # pix to obj id
-    pix_vtx_prop = np.zeros_like(pix_to_face)
+    # if the property is n dimensional (n,3), then pix_vtx_prop should have extra dimension
+    if len(vtx_prop.shape) == 2:
+        pix_vtx_prop = np.zeros((pix_to_face.shape[0], pix_to_face.shape[1], vtx_prop.shape[1]))
+    else:
+        pix_vtx_prop = np.zeros_like(pix_to_face)
     # pick the first vertex of each face
     pix_vtx_prop[valid_pix_to_face] = vtx_prop[mesh_faces_np[pix_to_face[valid_pix_to_face]][:, 0]]
 

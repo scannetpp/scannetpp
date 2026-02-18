@@ -1,6 +1,7 @@
 '''
 Get 3D semantics onto 2D images using precomputed rasterization
 '''
+from codetiming import Timer
 import copy
 from common.utils.image import get_expanded_bbox, get_img_crop, load_image, save_img, viz_ids, viz_obj_ids_txt
 from omegaconf import DictConfig
@@ -17,11 +18,12 @@ import cv2
 from common.utils.dslr import crop_undistorted_dslr_image
 from common.utils.dslr import compute_undistort_intrinsic
 from common.utils.colmap import get_camera_images_poses, camera_to_intrinsic
-from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper, viz_sem_ids_2d
-from common.file_io import read_txt_list
+from common.utils.anno import get_bboxes_2d, get_sem_ids_on_2d, get_visiblity_from_cache, get_vtx_prop_on_2d, load_anno_wrapper, viz_sem_ids_2d, get_top_images_from_visibility
+from common.file_io import read_txt_list, load_json
 from common.scene_release import ScannetppScene_Release
 
-from common.utils.rasterize import get_fisheye_cameras_batch, prep_pt3d_inputs, rasterize_mesh
+from common.utils.rasterize import get_fisheye_cameras_batch, prep_pt3d_inputs, rasterize_mesh, rasterize_mesh_nvdiffrast_large_batch
+from common.utils.rasterize import rasterize_mesh_nvdiffrast
 
 
 @hydra.main(version_base=None, config_path="../configs", config_name='semantics_2d')
@@ -49,6 +51,7 @@ def main(cfg : DictConfig) -> None:
     img_crop_dir =  save_dir / 'img_crops'
     img_crop_nobg_dir = save_dir / 'img_crops_nobg'
     img_crop_mask_dir = save_dir / 'img_crops_mask'
+    img_full_mask_dir = save_dir / 'img_full_mask'
     bbox_img_dir =  save_dir / 'img_bbox'
     viz_obj_ids_dir = save_dir / 'viz_obj_ids'
     viz_obj_ids_txt_dir = save_dir / 'viz_obj_ids_txt'
@@ -56,19 +59,28 @@ def main(cfg : DictConfig) -> None:
     undistorted_dir = save_dir / 'undistorted'
     obj_pcs_dir = save_dir / 'obj_pcs'
     obj_meshes_dir = save_dir / 'obj_meshes'
-    
 
-    for dir in [img_crop_dir, img_crop_nobg_dir, img_crop_mask_dir, bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, 
-        objid_gt_2d_dir, undistorted_dir, obj_pcs_dir, obj_meshes_dir, semantics_dir, 
+    for dir in [img_crop_dir, img_crop_nobg_dir, img_crop_mask_dir, img_full_mask_dir, \
+        bbox_img_dir, viz_obj_ids_dir, viz_obj_ids_txt_dir, objid_gt_2d_dir, \
+            undistorted_dir, obj_pcs_dir, obj_meshes_dir, semantics_dir, \
         semantics_viz_dir]:
         dir.mkdir(parents=True, exist_ok=True)
 
-    rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
+    if cfg.rasterout_dir is not None:
+        rasterout_dir = Path(cfg.rasterout_dir) / cfg.image_type
+    else:
+        rasterout_dir = None
 
     if cfg.save_semantic_gt_2d:
         semantic_classes = read_txt_list(cfg.semantic_classes_file)
         semantic_colors = np.loadtxt(cfg.semantic_2d_palette_path, dtype=np.uint8)
         print(f'Num semantic classes: {len(semantic_classes)}')
+
+    filter_objkeys = None
+    if cfg.filter_objkeys_list_file:
+        # list of (sceneid, objid) tuples
+        filter_objkeys = load_json(cfg.filter_objkeys_list_file)
+        filter_objkeys = [tuple(key) for key in filter_objkeys]
 
     # go through scenes
     for scene_id in tqdm(scene_list, desc='scene'):
@@ -83,23 +95,10 @@ def main(cfg : DictConfig) -> None:
             valid_vtx_mask = np.isin(anno['vertex_obj_ids'], cfg.filter_obj_ids)
             anno['vertex_obj_ids'][~valid_vtx_mask] = -1
 
-        if cfg.check_visibility:
-            # create visibility cache to pick topk images where an object is visible
-            visibility_data = get_visiblity_from_cache(scene, rasterout_dir, cfg.visiblity_cache_dir, 
-                                                       cfg.image_type, 
-                                                       cfg.subsample_factor, 
-                                                       cfg.undistort_dslr, 
-                                                       cfg.crop_undistorted_dslr_factor,
-                                                       limit_images=cfg.limit_images,
-                                                       anno=anno,
-                                                       filter_obj_ids=cfg.filter_obj_ids)
-        if cfg.create_visiblity_cache_only:
-            print(f'Created visibility cache for {scene_id}')
-            continue
-
         vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
         mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
+        mesh_faces_np = np.array(mesh.triangles)
 
         obj_ids = np.unique(vtx_obj_ids)
         # remove <= 0
@@ -116,6 +115,12 @@ def main(cfg : DictConfig) -> None:
         else:
             subsample_factor = cfg.subsample_factor
         colmap_camera, image_list, poses, distort_params_orig = get_camera_images_poses(scene, subsample_factor, cfg.image_type)
+        if cfg.get('filter_images'):
+            keep_img_ndx = [i for i, img_name in enumerate(image_list) if img_name in cfg.filter_images]
+            image_list = [image_list[i] for i in keep_img_ndx]
+            poses = [poses[i] for i in keep_img_ndx]
+            print(f'>>>>> Filtered images and poses: {image_list}')
+
         print('Num images:', len(image_list))
         # keep first 4 elements
         distort_params = distort_params_orig[:4]
@@ -129,10 +134,43 @@ def main(cfg : DictConfig) -> None:
             undistort_map1, undistort_map2 = cv2.fisheye.initUndistortRectifyMap(
                 intrinsic, distort_params, np.eye(3), undistort_intrinsic, (img_width, img_height), cv2.CV_32FC1
             )
+            # get dims of undistorted image
+            img_height_undistort, img_width_undistort = int(undistort_intrinsic[1, 2]*2), int(undistort_intrinsic[0, 2]*2)
 
         if cfg.get('limit_images'):
             print(f'Limiting to {cfg.limit_images} images')
             image_list = image_list[:cfg.limit_images]
+            poses = [poses[i] for i in range(cfg.limit_images)]
+
+        raster_cache = None
+        if cfg.rasterize_lib == 'nvdiffrast':
+            # rasterize all the images at once and store the pix2face, reuse
+            with Timer(name='Rasterizing', text="{name} done in {seconds:.4f}s"):
+                print(f'Rasterizing {len(image_list)} images...')
+                if cfg.image_type == 'dslr':
+                    if cfg.undistort_dslr:
+                        # use the undistorted intrinsics and img height and width directly
+                        # get undistorted pix2face
+                        raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height_undistort, img_width_undistort, poses, undistort_intrinsic)
+                    else:
+                        raise NotImplementedError(f'Undistortion not supported for {cfg.image_type} and original distorted images')
+                
+
+        if cfg.check_visibility:
+            # create visibility cache to pick topk images where an object is visible
+            visibility_data = get_visiblity_from_cache(scene, cfg.visiblity_cache_dir, 
+                                                       cfg.image_type, 
+                                                       colmap_camera, image_list, mesh,
+                                                       cfg.crop_undistorted_dslr_factor,
+                                                       anno=anno,
+                                                       filter_obj_ids=cfg.filter_obj_ids,
+                                                       filter_objkeys=filter_objkeys,
+                                                       raster_cache=raster_cache,
+                                                       n_proc=cfg.n_proc)
+
+        if cfg.create_visiblity_cache_only:
+            print(f'Created visibility cache for {scene_id}')
+            continue
 
         # go through list of images
         for image_ndx, image_name in enumerate(tqdm(image_list, desc='image', leave=False)):
@@ -148,62 +186,63 @@ def main(cfg : DictConfig) -> None:
                 print(f'Image not found: {img_path}, skipping')
                 continue
             
-            try:
-                print(f'Loading image: {img_path}')
-                img = load_image(img_path) 
-            except:
-                print(f'Error loading image: {img_path}, skipping')
-                continue
+            img = load_image(img_path) 
 
-            rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
-            if not rasterout_path.is_file():
-                # might not have rasterization, esp when specifying filter_images
-                print(f'Rasterization not found for {image_name}, rasterizing..')
-                _, _, meshes_batch = prep_pt3d_inputs(mesh)
-                # create batch of camera poses
-                if cfg.image_type == 'dslr':
-                    # add batch dimension
-                    poses_batch = torch.Tensor(poses[image_ndx]).unsqueeze(0)
-                    # get fisheye cameras with distortion
-                    cameras_batch = get_fisheye_cameras_batch(poses_batch, img_height, img_width, intrinsic, distort_params_orig)
-                    raster_out_dict = rasterize_mesh(meshes_batch, img_height, img_width, cameras_batch)
-                else:
-                    raise NotImplementedError(f'Image type {cfg.image_type} not supported')
+            if raster_cache is not None:
+                pix_to_face = raster_cache['pix_to_face'][image_ndx]
             else:
-                raster_out_dict = torch.load(rasterout_path)
+                # load rasterized output or do it now
+                if rasterout_dir is not None:
+                    rasterout_path = rasterout_dir / scene_id / f'{image_name}.pth'
+                else:
+                    rasterout_path = None
+                # no dir specified or rast output not found
+                if rasterout_dir is None or not rasterout_path.is_file():
+                    print(f'Rasterization not found for {image_name}, rasterizing..')
+                    _, _, meshes_batch = prep_pt3d_inputs(mesh)
+                    # create batch of camera poses
+                    if cfg.image_type == 'dslr':
+                        poses_batch = torch.Tensor(poses[image_ndx]).unsqueeze(0)
+                        if cfg.rasterize_lib == 'pytorch3d':
+                            # add batch dimension
+                            # get fisheye cameras with distortion
+                            cameras_batch = get_fisheye_cameras_batch(poses_batch, img_height, img_width, intrinsic, distort_params_orig)
+                            raster_out_dict = rasterize_mesh(meshes_batch, img_height, img_width, cameras_batch)
+                        elif cfg.rasterize_lib == 'nvdiffrast':
+                            # send all the params, handle in func
+                            # undistorted only?
+                            raster_out_dict = rasterize_mesh_nvdiffrast(mesh, img_height, img_width, poses[image_ndx], intrinsic, distort_params_orig, img)
+                        else:
+                            raise NotImplementedError(f'Rasterize lib {cfg.rasterize_lib} not supported')
+                    else:
+                        raise NotImplementedError(f'Image type {cfg.image_type} not supported')
+                else:
+                    raster_out_dict = torch.load(rasterout_path)
+                pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
 
             # if dimensions dont match, raster is from downsampled image
             # upsample using nearest neighbor
-            pix_to_face = raster_out_dict['pix_to_face'].squeeze().cpu()
             rasterized_dims = list(pix_to_face.shape)
 
             if rasterized_dims != [img_height, img_width]:
-                # upsample pixtoface and zbuf
+                # upsample pixtoface
                 pix_to_face = torch.nn.functional.interpolate(pix_to_face.unsqueeze(0).unsqueeze(0).float(),
                                                               size=(img_height, img_width), mode='nearest').squeeze().squeeze().long()
             pix_to_face = pix_to_face.numpy()
 
             if undistort_map1 is not None and undistort_map2 is not None:
-                # apply undistortion to rasterization (nearest neighbor), image (linear)
-                pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
-                    interpolation=cv2.INTER_NEAREST, borderMode=cv2.BORDER_REFLECT_101,
-                )
-                # img is np
+                # NOTE: rasterization is already undistorted
                 img = cv2.remap(img, undistort_map1, undistort_map2,
                     interpolation=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT_101,
                 )
                 if cfg.crop_undistorted_dslr_factor is not None:
                     pix_to_face = crop_undistorted_dslr_image(pix_to_face, cfg.crop_undistorted_dslr_factor)
                     img = crop_undistorted_dslr_image(img, cfg.crop_undistorted_dslr_factor)
+
             # get object IDs on image
-            try:
-                pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh)
-            except IndexError: # something wrong with the rasterization
-                print(f'Rasterization error in {scene_id}/{image_name}, skipping')
-                continue
+            pix_obj_ids = get_vtx_prop_on_2d(pix_to_face, vtx_obj_ids, mesh_faces_np)
 
             if cfg.get('filter_obj_ids'):
-                print(f'Filtering obj ids: {cfg.filter_obj_ids}')
                 pix_obj_ids = np.where(np.isin(pix_obj_ids, cfg.filter_obj_ids), pix_obj_ids, -1)
 
             if cfg.viz_obj_ids: # save viz to file
@@ -253,6 +292,10 @@ def main(cfg : DictConfig) -> None:
                     if obj_id == 0:
                         continue
 
+                    if filter_objkeys is not None:
+                        if (scene_id, obj_id) not in filter_objkeys:
+                            continue
+
                     if cfg.check_visibility:
                         # no viz data for this image -> skip
                         if image_name not in visibility_data['images']:
@@ -272,19 +315,13 @@ def main(cfg : DictConfig) -> None:
                         if visibility_data['images'][image_name]['objects'][str(obj_id)].get('visible_pixels_frac', 0) < cfg.obj_pixel_thresh:
                             continue
 
-                        if visibility_data['images'][image_name]['objects'][str(obj_id)].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
-                            # object is too far away from camera
-                            continue
+                        # if visibility_data['images'][image_name]['objects'][str(obj_id)].get('zbuf_min', 9999) > cfg.obj_dist_thresh:
+                        #     # object is too far away from camera
+                        #     continue
                         
                         if cfg.visibility_topk is not None:
-                            images_visibilites = []
-                            for i_name in visibility_data['images']:
-                                # convert obj keys to str always!
-                                if str(obj_id) in visibility_data['images'][i_name]['objects'] and 'visible_vertices_frac' in visibility_data['images'][i_name]['objects'][str(obj_id)]:
-                                    images_visibilites.append((i_name, visibility_data['images'][i_name]['objects'][str(obj_id)]['visible_vertices_frac']))
-                            # sort descending by visibility
-                            images_visibilites.sort(key=lambda x: x[1], reverse=True)
-                            top_images = [i_name for i_name, _ in images_visibilites][:cfg.visibility_topk]
+                            top_images = get_top_images_from_visibility(obj_id, visibility_data)
+                            top_images = top_images[:cfg.visibility_topk]
                             # dont consider this object in this image
                             if image_name not in top_images: 
                                 continue
@@ -313,15 +350,22 @@ def main(cfg : DictConfig) -> None:
                     if cfg.save_obj_crop_mask:
                         # make copy of img_crop
                         img_crop_mask = img_crop.copy()
-                        # set background to 0 in regions not the current object
+                        # crop img with obj mask (obj=255, bg=0)
                         img_crop_mask[pix_obj_ids_crop != obj_id] = 0
-                        # set foreground to white
                         img_crop_mask[pix_obj_ids_crop == obj_id] = 255
                         # keep only 1 channel
                         img_crop_mask = img_crop_mask[:, :, 0]
                         # save mask as PNG, no compression
                         img_crop_mask_path = img_crop_mask_dir / scene_id / f'{image_name}_{obj_id}.png'
                         save_img(img_crop_mask, img_crop_mask_path)
+
+                    if cfg.save_obj_full_mask:
+                        # full img with obj mask (obj=255, bg=0)
+                        img_full_mask = img.copy()
+                        img_full_mask[pix_obj_ids != obj_id] = 0
+                        img_full_mask[pix_obj_ids == obj_id] = 255
+                        img_full_mask_path = img_full_mask_dir / scene_id / f'{image_name}_{obj_id}.png'
+                        save_img(img_full_mask, img_full_mask_path)
 
                     if cfg.save_bbox_img:
                         # draw a bbox around the object and save the full image
@@ -385,4 +429,5 @@ def main(cfg : DictConfig) -> None:
 
 
 if __name__ == "__main__":
-    main()
+    with Timer(name='semantics_2d.main', text="{name} done in {seconds:.4f}s"):
+        main()
