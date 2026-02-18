@@ -22,10 +22,56 @@ try:
 except Exception as e:
     print(f'Error importing nvdiffrast: {e}')
 
+import open3d as o3d
 import numpy as np
 import cv2
 from tqdm import tqdm
 
+def get_pointmap_pt3d(scene, w2c, intrinsic, img_height, img_width):
+    '''
+    scene: scene object
+    w2c: world to camera matrix
+    intrinsic: intrinsic matrix
+    '''
+    # rasterize
+    poses_batch = torch.Tensor(w2c).unsqueeze(0)
+    # get fisheye cameras with distortion
+    cameras = get_opencv_cameras_batch(poses_batch, img_width, img_height, intrinsic)
+    mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
+    _, _, meshes_batch = prep_pt3d_inputs(mesh)
+    raster_out_dict = rasterize_mesh(meshes_batch, img_height, img_width, cameras)
+
+    # init point map with 0s
+    pointmap = torch.zeros((img_height, img_width, 3), device=device)
+    
+    # unproject the depth
+    depth = raster_out_dict['zbuf']
+
+    fx = intrinsic[0, 0]
+    fy = intrinsic[1, 1]
+    cx = intrinsic[0, 2]
+    cy = intrinsic[1, 2]
+
+    # W,
+    u = np.arange(img_width)
+    # H, 
+    v = np.arange(img_height)
+    # HW, HW
+    uu, vv = np.meshgrid(u, v)
+
+    Z = depth.squeeze().numpy()
+    X = (uu - cx) * Z / fx
+    Y = (vv - cy) * Z / fy
+
+    # Convert to right-handed PyTorch3D coordinates
+    # HW3
+    pointmap = np.stack([-X, -Y, Z], axis=-1)
+
+    # set pix2face=-1 to -1
+    pointmap[Z == -1] = -1
+
+    # get coords in pt3d frame
+    return pointmap
 
 def undistort_pix_to_face(pix_to_face, undistort_map1, undistort_map2):
     pix_to_face = cv2.remap(pix_to_face, undistort_map1, undistort_map2, 
