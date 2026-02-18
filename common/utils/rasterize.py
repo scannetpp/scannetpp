@@ -36,7 +36,7 @@ def get_pointmap_pt3d(scene, w2c, intrinsic, img_height, img_width):
     # rasterize
     poses_batch = torch.Tensor(w2c).unsqueeze(0)
     # get fisheye cameras with distortion
-    cameras = get_opencv_cameras_batch(poses_batch, img_width, img_height, intrinsic)
+    cameras = get_opencv_cameras_batch(poses_batch, img_height, img_width, intrinsic)
     mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
     _, _, meshes_batch = prep_pt3d_inputs(mesh)
     raster_out_dict = rasterize_mesh(meshes_batch, img_height, img_width, cameras)
