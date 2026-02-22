@@ -122,8 +122,9 @@ def main(cfg : DictConfig) -> None:
             print(f'>>>>> Filtered images and poses: {image_list}')
 
         print('Num images:', len(image_list))
-        # keep first 4 elements
-        distort_params = distort_params_orig[:4]
+        if cfg.image_type == 'dslr':
+            # keep first 4 elements
+            distort_params = distort_params_orig[:4]
 
         intrinsic = camera_to_intrinsic(colmap_camera)
         img_height, img_width = colmap_camera.height, colmap_camera.width
@@ -136,6 +137,12 @@ def main(cfg : DictConfig) -> None:
             )
             # get dims of undistorted image
             img_height_undistort, img_width_undistort = int(undistort_intrinsic[1, 2]*2), int(undistort_intrinsic[0, 2]*2)
+        elif cfg.image_type == 'iphone':
+            # iphone has no distortion
+            distort_params = None
+            undistort_map1, undistort_map2 = None, None
+            img_height_undistort, img_width_undistort = img_height, img_width
+            undistort_intrinsic = intrinsic
 
         if cfg.get('limit_images'):
             print(f'Limiting to {cfg.limit_images} images')
@@ -147,13 +154,12 @@ def main(cfg : DictConfig) -> None:
             # rasterize all the images at once and store the pix2face, reuse
             with Timer(name='Rasterizing', text="{name} done in {seconds:.4f}s"):
                 print(f'Rasterizing {len(image_list)} images...')
-                if cfg.image_type == 'dslr':
-                    if cfg.undistort_dslr:
-                        # use the undistorted intrinsics and img height and width directly
-                        # get undistorted pix2face
-                        raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height_undistort, img_width_undistort, poses, undistort_intrinsic)
-                    else:
-                        raise NotImplementedError(f'Undistortion not supported for {cfg.image_type} and original distorted images')
+                if cfg.image_type == 'iphone' or (cfg.undistort_dslr and cfg.image_type == 'dslr'):
+                    # use the undistorted intrinsics and img height and width directly
+                    # get undistorted pix2face
+                    raster_cache = rasterize_mesh_nvdiffrast_large_batch(mesh, img_height_undistort, img_width_undistort, poses, undistort_intrinsic)
+                else:
+                    raise NotImplementedError(f'Rasterization not supported for {cfg.image_type} and original distorted images')
                 
 
         if cfg.check_visibility:
@@ -259,7 +265,7 @@ def main(cfg : DictConfig) -> None:
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 torch.save(pix_obj_ids, out_path)
 
-            if cfg.save_undistorted_images:
+            if cfg.image_type == 'dslr' and cfg.save_undistorted_images:
                 out_path = undistorted_dir / scene_id / f'{image_name}.jpg'
                 out_path.parent.mkdir(parents=True, exist_ok=True)
                 save_img(img, out_path)
