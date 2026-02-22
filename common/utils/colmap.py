@@ -547,7 +547,7 @@ def get_camera_intrinsics(scene, image_type):
 
     return colmap_camera, distort_params
 
-def get_camera_images_poses(scene, subsample_factor, image_type):
+def get_camera_images_poses(scene, subsample_factor=1, image_type='dslr'):
     # this has all the camera info and image list with poses
     colmap_dir = scene.iphone_colmap_dir if image_type == 'iphone' else scene.dslr_colmap_dir
 
