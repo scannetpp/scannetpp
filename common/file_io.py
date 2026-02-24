@@ -28,6 +28,10 @@ def read_txt_list(path):
 
     return lines
 
+def write_txt_list(path, data):
+    with open(path, "w") as f:
+        f.write("\n".join(data))
+
 def load_yaml_munch(path):
     with open(path) as f:
         y = yaml.load(f, Loader=yaml.Loader)
