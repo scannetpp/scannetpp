@@ -101,8 +101,11 @@ def extract_rgb_in_colmap(scene, output_root):
     else:
         print(f"Aligning extracted files {len(extracted_files)} files with colmap image_list {len(sorted_image_list)}")
         for file_path, target_name in zip(extracted_files, sorted_image_list):
+            # filename might start with "iphone" or something else, remove it
+            tgt_file = Path(target_name).name
             # Rename to the final target name
-            final_path = output_dir / target_name
+            final_path = output_dir / tgt_file
+            
             # move file from tmp dir to output dir and rename to the target name
             shutil.move(file_path, final_path)
         print("Renaming complete.")
@@ -179,8 +182,11 @@ def main(cfg : DictConfig) -> None:
 
     # get the options to process
     # go through each scene
-    for scene_id in tqdm(scene_ids, desc='scene'):
+    for ndx, scene_id in enumerate(tqdm(scene_ids, desc='scene')):
         scene = ScannetppScene_Release(scene_id, data_root=Path(cfg.data_root) / 'data')
+        print(f'='*100)
+        print(f'Processing scene: {scene_id} ({ndx+1}/{len(scene_ids)})')
+        print(f'='*100)
 
         if cfg.extract_rgb:
             if cfg.extract_only_rgb_in_colmap:
