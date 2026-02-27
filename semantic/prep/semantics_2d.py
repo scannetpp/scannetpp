@@ -94,8 +94,15 @@ def main(cfg : DictConfig) -> None:
             anno['objects'] = {obj_id: anno['objects'][obj_id] for obj_id in cfg.filter_obj_ids}
             valid_vtx_mask = np.isin(anno['vertex_obj_ids'], cfg.filter_obj_ids)
             anno['vertex_obj_ids'][~valid_vtx_mask] = -1
-
-        vtx_obj_ids = anno['vertex_obj_ids']
+        
+        # optionally replace GT vertex obj IDs with previously associated IDs
+        if cfg.get('use_assoc_objids'):
+            assoc_root = Path(cfg.assoc_objids_root)
+            assoc_path = assoc_root / f"{scene_id}.npy"
+            vtx_obj_ids = np.load(assoc_path).astype(np.int32)
+            print(f'Replaced GT vertex obj IDs with associated IDs for {scene_id}')
+        else:
+            vtx_obj_ids = anno['vertex_obj_ids']
         # read mesh
         mesh = o3d.io.read_triangle_mesh(str(scene.scan_mesh_path)) 
         mesh_faces_np = np.array(mesh.triangles)

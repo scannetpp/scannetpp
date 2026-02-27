@@ -40,7 +40,6 @@ def main(cfg : DictConfig) -> None:
             # specify the scenes to run on 
             'filter_scenes': scene_id_group,
             # overrides from shell script
-            'rasterout_dir': cfg.rasterout_dir,
             'visiblity_cache_dir': cfg.visiblity_cache_dir,
             'subsample_factor': cfg.subsample_factor,
             'scene_list_file': cfg.scene_list_file,
@@ -50,7 +49,8 @@ def main(cfg : DictConfig) -> None:
             'save_obj_crop': cfg.save_obj_crop,
             'save_obj_crop_mask': cfg.save_obj_crop_mask,
             'filter_objkeys_list_file': cfg.filter_objkeys_list_file,
-            'bbox_expand_factor': cfg.bbox_expand_factor,
+            'use_assoc_objids': cfg.use_assoc_objids,
+            'assoc_objids_root': cfg.assoc_objids_root,
         }
 
         n_scenes_queued += len(scene_id_group)
